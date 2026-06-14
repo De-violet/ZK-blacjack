@@ -172,7 +172,7 @@ export default function Home() {
 
             {/* ZK Dashboard - toggles side panel */}
             <button
-              onClick={() => { toggleZKPanel(); setShowSidePanel(!showSidePanel); }}
+              onClick={() => { setShowSidePanel(!showSidePanel); }}
               className={`flex items-center justify-center h-8 w-8 rounded-lg border transition-colors relative ${
                 zkEnabled
                   ? 'bg-violet-900/50 border-violet-600/40 text-violet-400 hover:bg-violet-800/60'
@@ -526,9 +526,9 @@ export default function Home() {
       {/* ─── ZK Side Panel (Sliding) ─── */}
       {showSidePanel && (
         <>
-          <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setShowSidePanel(false)} />
-          <div className="fixed right-0 top-0 bottom-0 w-[300px] sm:w-[320px] bg-gray-900/98 border-l border-gray-700/40 z-50 overflow-y-auto shadow-2xl"
-            style={{ animation: 'overlay-slide-up 0.2s ease-out' }}
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowSidePanel(false)} />
+          <div className="fixed right-0 top-0 bottom-0 w-[300px] sm:w-[340px] bg-gray-900/98 border-l border-gray-700/40 z-50 overflow-y-auto shadow-2xl"
+            style={{ animation: 'slide-in-right 0.25s ease-out' }}
           >
             <div className="flex items-center justify-between p-3 border-b border-gray-800/60 sticky top-0 bg-gray-900/98 z-10">
               <div className="flex items-center gap-2">
