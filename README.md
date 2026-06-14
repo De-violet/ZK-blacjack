@@ -1,14 +1,15 @@
-# ZK Blackjack - Provably Fair Casino with Zero-Knowledge Proofs
+# ZK Blackjack — Provably Fair Casino with Zero-Knowledge Proofs
 
-A full-featured Blackjack game built with Next.js that implements a **provably fair** system using cryptographic hash commitments and **Zero-Knowledge Proofs (ZKP)** for verifiable gameplay integrity.
+A full-featured Blackjack game built with Next.js 16 that implements a **provably fair** system using cryptographic hash commitments and **Zero-Knowledge Proofs (ZKP)** for verifiable gameplay integrity.
 
-Players can independently verify that the deck was not manipulated at any point during the game, without relying on trust.
+Players can independently verify that the deck was not manipulated at any point during the game — without relying on trust.
 
 ---
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Live Demo](#live-demo)
 - [How Provably Fair Works](#how-provably-fair-works)
 - [Zero-Knowledge Proof System](#zero-knowledge-proof-system)
 - [Tech Stack](#tech-stack)
@@ -28,14 +29,20 @@ ZK Blackjack is a single-player Blackjack game that focuses on cryptographic fai
 
 The system follows a 4-phase roadmap:
 
-| Phase | Name | Description |
-|-------|------|-------------|
-| Phase 1 | Basic Game | Standard Blackjack rules, 6-deck shoe, local shuffle |
-| Phase 2 | Server Shuffle | Deck shuffled server-side via API, separated from client |
-| Phase 3 | Hash Commitment | SHA-256 seed commitment before each round; post-round verification |
-| Phase 4 | Zero-Knowledge Proofs | Merkle trees, VRF, range proofs, shuffle proofs for mid-game verification |
+| Phase | Name | Description | Status |
+|-------|------|-------------|--------|
+| Phase 1 | Basic Game | Standard Blackjack rules, 6-deck shoe, local shuffle | ✅ Complete |
+| Phase 2 | Server Shuffle | Deck shuffled server-side via API, separated from client | ✅ Complete |
+| Phase 3 | Hash Commitment | SHA-256 seed commitment before each round; post-round verification | ✅ Complete |
+| Phase 4 | Zero-Knowledge Proofs | Merkle trees, VRF, range proofs, shuffle proofs for mid-game verification | ✅ Complete |
 
-The game is currently at **Phase 4**.
+The game is currently at **Phase 4** — all features are live.
+
+---
+
+## Live Demo
+
+🌐 **[zk.purpled.my.id](https://zk.purpled.my.id)**
 
 ---
 
@@ -77,13 +84,13 @@ After the round, the full Fisher-Yates shuffle trace is revealed. Each swap step
 
 ```
 Before Round:
-  Server -> Client: merkleRoot, vrfProof, serverSeedHash
+  Server → Client: merkleRoot, vrfProof, serverSeedHash
 
 During Round (per card dealt):
-  Server -> Client: card, merkleProof, rangeProof
+  Server → Client: card, merkleProof, rangeProof
 
 After Round:
-  Server -> Client: serverSeed, shuffleProof
+  Server → Client: serverSeed, shuffleProof
 
 Client verifies:
   1. SHA-256(serverSeed) === serverSeedHash
@@ -93,82 +100,82 @@ Client verifies:
   5. Replaying the shuffle with the revealed seed produces the same deck
 ```
 
+### Visual Trust Indicators
+
+The game provides multiple visual indicators so players can immediately see that ZK proofs are active:
+
+- **ZK Trust Banner** — A purple banner below the header showing "Zero-Knowledge Proof Active" with a live indicator
+- **Card Verification Badges** — A violet checkmark badge on each dealt card when ZK is enabled
+- **ZK Dashboard Panel** — A sliding side panel (click the ShieldCheck icon) showing real-time Merkle Root, VRF Output, Card Proofs, and verification status
+- **Footer Status** — Shows "ZK Verified" label with Merkle root preview and verification result
+
 ---
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js 16 (App Router, standalone output) |
+| Framework | Next.js 16 (App Router) |
 | Language | TypeScript |
-| Runtime | Bun |
+| Runtime | Bun / Node.js |
 | Styling | Tailwind CSS 4 |
 | UI Components | shadcn/ui (Radix primitives) |
 | State Management | Zustand |
-| Data Fetching | TanStack React Query |
 | Database | SQLite via Prisma ORM |
 | Animations | Framer Motion |
-| Reverse Proxy | Caddy |
 | Crypto | Web Crypto API (SHA-256, HMAC) |
+| Icons | Lucide React |
 
 ---
 
 ## Project Structure
 
 ```
-.
-├── src/
-│   ├── app/
-│   │   ├── page.tsx              # Main game page
-│   │   ├── layout.tsx            # Root layout
-│   │   ├── globals.css           # Global styles
-│   │   └── api/
-│   │       ├── route.ts          # Base API route
-│   │       ├── seed/route.ts     # Provably fair seed API (commit/reveal)
-│   │       └── zk/route.ts       # Zero-Knowledge proof API
-│   ├── components/
-│   │   ├── blackjack/            # Game-specific components
-│   │   │   ├── BettingArea.tsx
-│   │   │   ├── GameControls.tsx
-│   │   │   ├── HandDisplay.tsx
-│   │   │   ├── PlayingCard.tsx
-│   │   │   ├── ProvablyFairPanel.tsx
-│   │   │   ├── ZKProofPanel.tsx
-│   │   │   ├── StatsPanel.tsx
-│   │   │   ├── CardCounterDisplay.tsx
-│   │   │   ├── StrategyChart.tsx
-│   │   │   ├── SideBets.tsx
-│   │   │   └── ...               # 20+ additional components
-│   │   └── ui/                   # shadcn/ui base components
-│   ├── lib/
-│   │   ├── blackjack.ts          # Core game logic (rules, scoring, payouts)
-│   │   ├── provably-fair.ts      # Phase 3: Hash commitment, seeded RNG, verification
-│   │   ├── zk-crypto.ts          # Phase 4: Merkle tree, VRF, range/shuffle proofs
-│   │   ├── card-counter.ts       # Hi-Lo card counting system
-│   │   ├── basic-strategy.ts     # Blackjack basic strategy engine
-│   │   ├── achievements.ts       # Achievement/trophy system
-│   │   ├── sounds.ts             # Sound effects
-│   │   └── db.ts                 # Database client
-│   ├── store/
-│   │   └── game-store.ts         # Zustand store (game state, actions)
-│   └── hooks/                    # Custom React hooks
-├── prisma/
-│   └── schema.prisma             # Database schema (User, Post models)
-├── db/
-│   └── custom.db                 # SQLite database file
-├── mini-services/                # Optional micro-services
-├── public/                       # Static assets
-├── .zscripts/
-│   ├── dev.sh                    # Development startup script
-│   ├── build.sh                  # Production build script
-│   └── start.sh                  # Production start script
-├── Caddyfile                     # Caddy reverse proxy config
-├── .env.example                  # Environment variable template
-├── package.json
-├── tsconfig.json
-├── tailwind.config.ts
-├── next.config.ts
-└── README.md
+src/
+├── app/
+│   ├── page.tsx                 # Main game page (all-in-one UI)
+│   ├── layout.tsx               # Root layout with fonts & metadata
+│   ├── globals.css              # Global styles & keyframe animations
+│   └── api/
+│       ├── route.ts             # Base API route
+│       ├── seed/route.ts        # Provably fair seed API (commit/reveal)
+│       └── zk/route.ts          # Zero-Knowledge proof API
+├── components/
+│   ├── blackjack/               # Game-specific components (30+)
+│   │   ├── BettingArea.tsx      # Chip selection & bet placement
+│   │   ├── GameControls.tsx     # Hit/Stand/Double/Split/Surrender
+│   │   ├── HandDisplay.tsx      # Card hand rendering
+│   │   ├── PlayingCard.tsx      # Individual card with ZK badge
+│   │   ├── StatsPanel.tsx       # Win/loss statistics overlay
+│   │   ├── ProvablyFairPanel.tsx # Phase 3 verification panel
+│   │   ├── ZKProofPanel.tsx     # Phase 4 ZK proof panel
+│   │   ├── ZKSidePanel.tsx      # ZK Dashboard (sliding overlay)
+│   │   ├── SessionSummary.tsx   # Round summary overlay
+│   │   ├── StrategyChart.tsx    # Basic strategy recommendations
+│   │   ├── CardCounterDisplay.tsx # Hi-Lo counting display
+│   │   ├── HandProbability.tsx  # Live odds calculator
+│   │   ├── SideBets.tsx         # Perfect Pairs & 21+3
+│   │   ├── BalanceChart.tsx     # Balance history chart
+│   │   ├── HandReplay.tsx       # Replay previous hands
+│   │   ├── VerificationHistory.tsx # Round verification log
+│   │   ├── AchievementToast.tsx # Achievement notifications
+│   │   ├── PhaseRoadmap.tsx     # Phase progress indicator
+│   │   └── ...                  # 10+ additional components
+│   └── ui/                      # shadcn/ui base components (40+)
+├── lib/
+│   ├── blackjack.ts             # Core game logic (rules, scoring, payouts)
+│   ├── provably-fair.ts         # Phase 3: Hash commitment, seeded RNG
+│   ├── zk-crypto.ts             # Phase 4: Merkle tree, VRF, range/shuffle proofs
+│   ├── card-counter.ts          # Hi-Lo card counting system
+│   ├── basic-strategy.ts        # Blackjack basic strategy engine
+│   ├── achievements.ts          # Achievement/trophy system
+│   ├── sounds.ts                # Sound effects (Web Audio API)
+│   └── db.ts                    # Prisma database client
+├── store/
+│   └── game-store.ts            # Zustand store (game state, actions)
+└── hooks/                       # Custom React hooks
+    ├── use-game-persistence.ts  # LocalStorage persistence
+    └── ...
 ```
 
 ---
@@ -177,61 +184,52 @@ Client verifies:
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) (v1.0 or later)
-- [Node.js](https://nodejs.org/) (v18 or later, for compatibility)
+- [Node.js](https://nodejs.org/) v18 or later
+- [Bun](https://bun.sh/) (optional, but recommended)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd zk-blackjack
+git clone https://github.com/De-violet/ZK-blacjack.git
+cd ZK-blacjack
 
 # Install dependencies
-bun install
+npm install
 
 # Set up environment variables
 cp .env.example .env
 
 # Push database schema
-bun run db:push
+npm run db:push
 
 # Generate Prisma client
-bun run db:generate
+npm run db:generate
 
 # Start the development server
-bun run dev
+npm run dev
 ```
 
 The app will be available at `http://localhost:3000`.
 
-### Production Build
+### Production Build (Vercel)
 
-```bash
-# Build for production (creates standalone output)
-bun run build
+This project is optimized for **Vercel** deployment:
 
-# Start production server
-bun run start
-```
+1. Push to GitHub
+2. Connect the repository to Vercel
+3. Vercel auto-detects Next.js and runs `next build`
+4. No special configuration needed
 
 ---
 
 ## Environment Variables
-
-Copy `.env.example` to `.env` and fill in the values:
-
-```bash
-cp .env.example .env
-```
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DATABASE_URL` | SQLite database connection string | `file:./db/custom.db` |
 | `NEXTAUTH_SECRET` | Secret key for NextAuth.js session encryption | _(generate a random string)_ |
 | `NEXTAUTH_URL` | Canonical URL of your application | `http://localhost:3000` |
-| `PORT` | Port for the production server | `3000` |
-| `NODE_ENV` | Environment mode | `development` |
 
 ---
 
@@ -239,14 +237,14 @@ cp .env.example .env
 
 | Script | Command | Description |
 |--------|---------|-------------|
-| `dev` | `bun run dev` | Start Next.js dev server on port 3000 |
-| `build` | `bun run build` | Build for production with standalone output |
-| `start` | `bun run start` | Run production server |
-| `lint` | `bun run lint` | Run ESLint |
-| `db:push` | `bun run db:push` | Push Prisma schema to database |
-| `db:generate` | `bun run db:generate` | Generate Prisma client |
-| `db:migrate` | `bun run db:migrate` | Run database migrations |
-| `db:reset` | `bun run db:reset` | Reset database and re-apply migrations |
+| `dev` | `npm run dev` | Start Next.js dev server on port 3000 |
+| `build` | `npm run build` | Build for production (`next build`) |
+| `start` | `npm run start` | Run production server (standalone) |
+| `lint` | `npm run lint` | Run ESLint |
+| `db:push` | `npm run db:push` | Push Prisma schema to database |
+| `db:generate` | `npm run db:generate` | Generate Prisma client |
+| `db:migrate` | `npm run db:migrate` | Run database migrations |
+| `db:reset` | `npm run db:reset` | Reset database and re-apply migrations |
 
 ---
 
@@ -262,65 +260,72 @@ cp .env.example .env
 
 ### Side Bets
 
-- **Perfect Pairs**: Perfect (25:1), Colored (12:1), Mixed (6:1)
-- **21+3**: Suited Trips (100:1), Straight Flush (40:1), Three of a Kind (30:1), Straight (10:1), Flush (5:1)
+| Side Bet | Type | Payout |
+|----------|------|--------|
+| Perfect Pairs | Perfect (same suit & rank) | 25:1 |
+| Perfect Pairs | Colored (same color & rank) | 12:1 |
+| Perfect Pairs | Mixed (same rank, different color) | 6:1 |
+| 21+3 | Suited Trips | 100:1 |
+| 21+3 | Straight Flush | 40:1 |
+| 21+3 | Three of a Kind | 30:1 |
+| 21+3 | Straight | 10:1 |
+| 21+3 | Flush | 5:1 |
 
-### Tools and Analytics
+### Tools & Analytics
 
-- **Card Counter**: Hi-Lo counting system with running count, true count, and betting advice
-- **Basic Strategy Chart**: Real-time recommendations for every hand
-- **Hand Probability**: Live odds for hitting, standing, and busting
-- **Statistics Panel**: Win/loss tracking, streaks, session profit
-- **Balance History Chart**: Visual balance over time
-- **Hand Replay**: Review previous hands play-by-play
-- **Achievements**: 11 unlockable trophies
+- **Card Counter** — Hi-Lo counting system with running count, true count, and betting advice
+- **Basic Strategy Chart** — Real-time recommendations for every hand situation
+- **Hand Probability** — Live odds for hitting, standing, and busting
+- **Statistics Panel** — Win/loss tracking, streaks, session profit, balance history
+- **Hand Replay** — Review previous hands play-by-play
+- **Achievements** — Unlockable trophies for milestones
 
-### Fairness and Verification
+### Fairness & Verification
 
-- **Provably Fair Panel**: View seed hashes, verify past rounds, inspect shuffle
-- **ZK Proof Panel**: View Merkle root, VRF proof status, per-card Merkle proofs, verification results
-- **Verification History**: Browse and re-verify any previous round
+- **ZK Trust Banner** — Visible indicator showing ZK proofs are active
+- **ZK Dashboard** — Real-time Merkle Root, VRF Output, Card Proofs, verification status
+- **Provably Fair Panel** — Seed hash inspection, round verification, deal order
+- **Verification History** — Browse and re-verify any previous round
+- **Card ZK Badges** — Visual proof badge on each dealt card
 
 ### User Experience
 
 - Keyboard shortcuts (H=Hit, S=Stand, D=Double, N=New Round, Space=Deal)
-- Sound effects with toggle
-- Smooth card animations
-- Dark theme with casino-style design
-- Fully responsive layout
+- Sound effects with mute toggle
+- Smooth card deal, flip, and win animations
+- Dark casino-style theme with green felt background
+- Responsive layout (mobile & desktop)
+- Auto-save game state to localStorage
 
 ---
 
 ## Deployment
 
-### Using the Build Scripts
+### Vercel (Recommended)
 
-The project includes shell scripts in `.zscripts/` for deployment:
+1. Push your code to GitHub
+2. Import the repository on [vercel.com](https://vercel.com)
+3. Framework preset: **Next.js** (auto-detected)
+4. Click **Deploy**
+
+No additional configuration needed — `next build` is the only build step.
+
+### VPS / Self-Hosted (Docker + Caddy)
+
+The project includes shell scripts for self-hosted deployment:
 
 ```bash
-# Development (installs deps, sets up DB, starts dev server + mini-services)
+# Development (installs deps, sets up DB, starts dev server)
 sh .zscripts/dev.sh
 
-# Production build (creates tar.gz with all artifacts)
+# Production build (creates standalone output + tarball)
 sh .zscripts/build.sh
 
-# Production start (runs Next.js + Caddy + mini-services)
+# Production start (runs Next.js + Caddy reverse proxy)
 sh .zscripts/start.sh
 ```
 
-### Caddy Reverse Proxy
-
-The included `Caddyfile` configures Caddy to listen on port 81 and proxy requests to the Next.js server on port 3000. It also supports dynamic port routing via the `XTransformPort` query parameter.
-
-### Docker / VPS
-
-For deployment on a VPS or container:
-
-1. Run `sh .zscripts/build.sh` to produce a build tarball
-2. Transfer the tarball to the server
-3. Extract and run `sh start.sh`
-
-The production server uses standalone output, so `node_modules` is not required at runtime.
+The `Caddyfile` configures Caddy to listen on port 81 and proxy to the Next.js server on port 3000.
 
 ---
 
