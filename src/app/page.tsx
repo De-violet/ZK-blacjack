@@ -7,6 +7,7 @@ import { HandDisplay } from '@/components/blackjack/HandDisplay';
 import { StatsPanel } from '@/components/blackjack/StatsPanel';
 import { ProvablyFairPanel } from '@/components/blackjack/ProvablyFairPanel';
 import { ZKProofPanel } from '@/components/blackjack/ZKProofPanel';
+import { ZKSidePanel } from '@/components/blackjack/ZKSidePanel';
 import { Button } from '@/components/ui/button';
 import { Wallet, BarChart3, RotateCcw, Volume2, VolumeX, Shield, HelpCircle, X, ShieldCheck } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -111,7 +112,9 @@ export default function Home() {
   }, [handleKeyDown]);
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-gray-950 text-white overflow-hidden">
+    <div className="h-[100dvh] flex flex-col lg:flex-row bg-gray-950 text-white overflow-hidden">
+      {/* ─── Left Column: Game ─── */}
+      <div className="flex-1 flex flex-col min-w-0 lg:max-w-[65%]">
       {/* ─── Header ─────────────────────────────────────────────── */}
       <header className="w-full bg-gray-900/95 backdrop-blur-sm border-b border-gray-800/50 px-2 sm:px-4 py-2 sm:py-2.5 z-40 flex-shrink-0 relative overflow-visible">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
@@ -520,6 +523,12 @@ export default function Home() {
 
       {/* ZK Proof Panel */}
       <ZKProofPanel />
+      </div>
+
+      {/* ─── Right Column: ZK Side Panel ─── */}
+      <div className="hidden lg:flex w-[320px] xl:w-[360px] flex-shrink-0 bg-gray-900/50 border-l border-gray-800/40 overflow-hidden">
+        <ZKSidePanel />
+      </div>
     </div>
   );
 }
