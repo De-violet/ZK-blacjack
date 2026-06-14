@@ -128,9 +128,9 @@ export default function Home() {
           </div>
 
           {/* Right side */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Balance pill */}
-            <div className="flex items-center gap-1 bg-gray-800/70 rounded-lg px-2 sm:px-2.5 py-1 border border-gray-700/30">
+            <div className="flex items-center gap-1 bg-amber-900/40 rounded-lg px-2 sm:px-2.5 py-1 border border-amber-700/30">
               <Wallet className="w-4 h-4 text-amber-400" />
               <span
                 className="text-amber-300 font-mono font-bold text-[11px] sm:text-sm"
@@ -142,76 +142,72 @@ export default function Home() {
             </div>
 
             {/* Sound toggle */}
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={handleToggleSound}
-              className={`h-7 w-7 p-0 transition-colors duration-200 ${
-                soundEnabled ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-900/20' : 'text-gray-300 hover:text-white hover:bg-gray-800'
-              }`}
+              className="flex items-center justify-center h-8 w-8 rounded-lg bg-gray-700/60 border border-gray-600/30 text-amber-400 hover:bg-gray-600/80 transition-colors"
+              title={soundEnabled ? 'Mute' : 'Unmute'}
             >
               {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            </Button>
+            </button>
 
             {/* Help */}
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={() => setShowHelp(true)}
-              className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+              className="flex items-center justify-center h-8 w-8 rounded-lg bg-gray-700/60 border border-gray-600/30 text-blue-400 hover:bg-gray-600/80 transition-colors"
+              title="Help"
             >
               <HelpCircle className="w-4 h-4" />
-            </Button>
+            </button>
 
             {/* Stats */}
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={toggleStats}
-              className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+              className="flex items-center justify-center h-8 w-8 rounded-lg bg-gray-700/60 border border-gray-600/30 text-green-400 hover:bg-gray-600/80 transition-colors"
+              title="Statistics"
             >
               <BarChart3 className="w-4 h-4" />
-            </Button>
+            </button>
 
             {/* ZK Proofs (Phase 4) */}
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={toggleZKPanel}
-              className={`h-8 w-8 p-0 transition-colors relative ${
-                zkEnabled ? 'text-violet-400 hover:text-violet-300 hover:bg-violet-900/20' : 'text-gray-300 hover:text-white hover:bg-gray-800'
+              className={`flex items-center justify-center h-8 w-8 rounded-lg border transition-colors relative ${
+                zkEnabled
+                  ? 'bg-violet-900/50 border-violet-600/40 text-violet-400 hover:bg-violet-800/60'
+                  : 'bg-gray-700/60 border-gray-600/30 text-purple-400 hover:bg-gray-600/80'
               }`}
+              title="ZK Proofs"
             >
               <ShieldCheck className="w-4 h-4" />
               {zkEnabled && (
-                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-violet-400 border border-gray-900" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-violet-400 border border-gray-900" />
               )}
-            </Button>
+            </button>
 
             {/* Provably Fair */}
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={toggleProvablyFairPanel}
-              className={`h-8 w-8 p-0 transition-colors relative ${
-                provablyFairEnabled ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20' : 'text-gray-300 hover:text-white hover:bg-gray-800'
+              className={`flex items-center justify-center h-8 w-8 rounded-lg border transition-colors relative ${
+                provablyFairEnabled
+                  ? 'bg-emerald-900/50 border-emerald-600/40 text-emerald-400 hover:bg-emerald-800/60'
+                  : 'bg-gray-700/60 border-gray-600/30 text-teal-400 hover:bg-gray-600/80'
               }`}
+              title="Provably Fair"
             >
               <Shield className="w-4 h-4" />
               {provablyFairEnabled && (
-                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400 border border-gray-900" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 border border-gray-900" />
               )}
-            </Button>
+            </button>
 
             {/* Reset */}
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={resetGame}
-              className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+              className="flex items-center justify-center h-8 w-8 rounded-lg bg-gray-700/60 border border-gray-600/30 text-red-400 hover:bg-gray-600/80 transition-colors"
+              title="Reset Game"
             >
               <RotateCcw className="w-4 h-4" />
-            </Button>
+            </button>
           </div>
         </div>
       </header>
