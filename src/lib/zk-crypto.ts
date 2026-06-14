@@ -26,7 +26,7 @@
 //   - Range proof commitments match the revealed positions
 //   - Shuffle proof steps are correct
 
-import { sha256, seededShuffle, SeededRNG } from './provably-fair';
+import { sha256, seededShuffle, SeededRNG, createStandardDeckAbbreviated } from './provably-fair';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -600,7 +600,7 @@ export async function verifyZKProof(
 export async function verifyZKFull(
   roundProof: ZKRoundProof,
   serverSeed: string,
-  originalDeck: string[],
+  revealedShuffledDeck: string[],
 ): Promise<ZKVerificationResult> {
   // First do the basic verification
   const basicResult = await verifyZKProof(roundProof, roundProof.commitment.serverSeedHash);
@@ -612,9 +612,11 @@ export async function verifyZKFull(
   const computedSeedHash = await sha256(serverSeed);
   const seedHashMatches = computedSeedHash === roundProof.commitment.serverSeedHash;
   
-  // Verify the shuffle produces the same deck
-  const reshuffled = seededShuffle(originalDeck, serverSeed, roundProof.commitment.clientSeed, roundProof.commitment.nonce);
-  const shuffleMatches = reshuffled.join(',') === originalDeck.join(',');
+  // Verify the shuffle produces the same deck as the revealed shuffled deck
+  // Re-shuffle a fresh standard deck with the revealed seed — must match the server's shuffled deck
+  const freshDeck = createStandardDeckAbbreviated();
+  const reshuffled = seededShuffle(freshDeck, serverSeed, roundProof.commitment.clientSeed, roundProof.commitment.nonce);
+  const shuffleMatches = reshuffled.join(',') === revealedShuffledDeck.join(',');
   
   // Verify shuffle proof if available
   let shuffleProofValid = basicResult.shuffleValid;

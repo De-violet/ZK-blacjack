@@ -440,7 +440,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         zkCommit = null;
       }
     } else if (provablyFairEnabled) {
-      // ── Phase 3 MODE: Hash commitment (deck sent — known limitation) ──
+      // ── Phase 3 MODE: Hash commitment + server-side dealing (ZK-compatible) ──
       try {
         const clientSeed = prevCommitment?.clientSeed || generateClientSeed();
         const response = await fetch('/api/seed', {
@@ -454,16 +454,40 @@ export const useGameStore = create<GameStore>((set, get) => ({
           serverSeedHash: data.serverSeedHash,
           clientSeed: data.clientSeed,
           nonce: data.nonce,
-          shuffledDeck: data.shuffledDeck,
+          shuffledDeck: [], // Deck NOT sent during play — genuine ZK
         };
-        const deck = parseAbbreviatedDeck(commitment.shuffledDeck) as Card[];
-        const { card: p1, remainingDeck: d1 } = dealCard(deck, true);
-        const { card: d1Card, remainingDeck: d2 } = dealCard(d1, true);
-        const { card: p2, remainingDeck: d3 } = dealCard(d2, true);
-        const { card: d2Card, remainingDeck: d4 } = dealCard(d3, false);
-        playerHand = [p1, p2];
-        dealerHand = [d1Card, d2Card];
-        remainingDeck = d4;
+
+        // Request initial 4 cards from server with Merkle proofs
+        const dealResponse = await fetch('/api/seed/deal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roundId: data.roundId, count: 4 }),
+        });
+        const dealData = await dealResponse.json();
+
+        if (!dealData.cards || dealData.cards.length < 4) {
+          throw new Error('Failed to deal initial cards from seed API');
+        }
+
+        const dealtCards = dealData.cards;
+        playerHand = [
+          parseAbbreviatedCard(dealtCards[0].card, true),
+          parseAbbreviatedCard(dealtCards[2].card, true),
+        ];
+        dealerHand = [
+          parseAbbreviatedCard(dealtCards[1].card, true),
+          parseAbbreviatedCard(dealtCards[3].card, false), // face down
+        ];
+        remainingDeck = []; // No local deck — cards come from server
+
+        // Verify Merkle proofs for dealt cards
+        for (const c of dealtCards) {
+          const proof = c.merkleProof as import('@/lib/zk-crypto').MerkleProof;
+          const isValid = await verifyMerkleProof(proof);
+          if (!isValid) {
+            console.warn(`Phase 3: Merkle proof invalid for card ${c.card} at position ${c.position}`);
+          }
+        }
       } catch {
         const deck = shuffleDeck(createDeck(6));
         const { card: p1, remainingDeck: d1 } = dealCard(deck, true);
@@ -519,7 +543,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         seedCommitment: commitment,
         revealedSeed: null,
         isSeedVerified: null,
-        initialDeckOrder: commitment?.shuffledDeck || null,
+        initialDeckOrder: null, // Deck NOT available during play — only after reveal
         zkCommitment: zkCommit,
         zkCardProofs: [],
         zkVerification: null,
@@ -570,7 +594,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         seedCommitment: commitment,
         revealedSeed: null,
         isSeedVerified: null,
-        initialDeckOrder: commitment?.shuffledDeck || null,
+        initialDeckOrder: null, // Deck NOT available during play — only after reveal
         zkCommitment: zkCommit,
         zkCardProofs: [],
         zkVerification: null,
@@ -598,7 +622,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       seedCommitment: commitment,
       revealedSeed: null,
       isSeedVerified: null,
-      initialDeckOrder: commitment?.shuffledDeck || null,
+      initialDeckOrder: null, // Deck NOT available during play — only after reveal
       zkCommitment: zkCommit,
       zkCardProofs: [],
       zkVerification: null,
@@ -726,10 +750,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
 
-    // ── ZK MODE: Fetch card from server ──
-    if (zkEnabled && provablyFairEnabled && seedCommitment) {
+    // ── Server-side dealing (ZK + Phase 3): Fetch card from server ──
+    if (provablyFairEnabled && seedCommitment) {
+      const dealEndpoint = zkEnabled ? '/api/zk/deal' : '/api/seed/deal';
       set({ isAnimating: true });
-      fetch('/api/zk/deal', {
+      fetch(dealEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roundId: seedCommitment.roundId, count: 1 }),
@@ -907,8 +932,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const revealedHand = dealerHand.map(c => ({ ...c, faceUp: true }));
     let currentDealerHand = [...revealedHand];
 
-    // ── ZK MODE: Fetch dealer cards from server one at a time ──
-    if (zkEnabled && provablyFairEnabled && seedCommitment) {
+    // ── Server-side dealing (ZK + Phase 3): Fetch dealer cards from server one at a time ──
+    if (provablyFairEnabled && seedCommitment) {
+      const dealEndpoint = zkEnabled ? '/api/zk/deal' : '/api/seed/deal';
       set({ dealerHand: revealedHand });
 
       const dealerPlayZK = async () => {
@@ -916,7 +942,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         if (action === 'hit') {
           try {
-            const res = await fetch('/api/zk/deal', {
+            const res = await fetch(dealEndpoint, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ roundId: seedCommitment.roundId, count: 1 }),
@@ -1063,10 +1089,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set({ balance: balance - currentBet, currentBet: currentBet * 2 });
 
-    // ── ZK MODE: Fetch card from server ──
-    if (zkEnabled && provablyFairEnabled && seedCommitment) {
+    // ── Server-side dealing (ZK + Phase 3): Fetch card from server ──
+    if (provablyFairEnabled && seedCommitment) {
+      const dealEndpoint = zkEnabled ? '/api/zk/deal' : '/api/seed/deal';
       set({ isAnimating: true });
-      fetch('/api/zk/deal', {
+      fetch(dealEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roundId: seedCommitment.roundId, count: 1 }),

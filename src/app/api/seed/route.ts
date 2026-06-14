@@ -3,9 +3,33 @@ import { createHash, randomBytes } from 'crypto';
 
 // API endpoint for generating provably fair seed commitments
 // This runs server-side so the serverSeed is never exposed to the client until revealed
+//
+// ZK FIX: The shuffled deck is NEVER sent to the client during play.
+// Cards are dealt via /api/zk/deal (or /api/seed/deal) with Merkle proofs.
+// The full deck is ONLY revealed after the round via PUT.
 
 // In-memory store for pending seeds (in production, use a database)
-const pendingSeeds = new Map<string, { serverSeed: string; clientSeed: string; nonce: number; createdAt: number }>();
+interface SeedRoundData {
+  serverSeed: string;
+  clientSeed: string;
+  nonce: number;
+  shuffledDeck: string[];
+  merkleTree: string[][];
+  leafHashes: string[];
+  nextPosition: number;
+  createdAt: number;
+  revealed: boolean;
+}
+
+// Use globalThis so the /api/seed/deal route can access the same store
+const getPendingSeeds = (): Map<string, SeedRoundData> => {
+  if (!(globalThis as Record<string, unknown>).__seedRounds) {
+    (globalThis as Record<string, unknown>).__seedRounds = new Map<string, SeedRoundData>();
+  }
+  return (globalThis as Record<string, unknown>).__seedRounds as Map<string, SeedRoundData>;
+};
+
+const pendingSeeds = getPendingSeeds();
 
 // Clean up seeds older than 1 hour
 function cleanupOldSeeds() {
@@ -103,6 +127,30 @@ function seededShuffle(array: string[], serverSeed: string, clientSeed: string, 
   return shuffled;
 }
 
+// Build Merkle tree from leaves (server-side sync version)
+function buildMerkleTree(leaves: string[]): { root: string; tree: string[][] } {
+  const n = leaves.length;
+  const paddedSize = Math.pow(2, Math.ceil(Math.log2(Math.max(n, 1))));
+  const padded = [...leaves];
+  while (padded.length < paddedSize) {
+    padded.push(serverHash('EMPTY'));
+  }
+
+  const tree: string[][] = [padded];
+  let current = padded;
+
+  while (current.length > 1) {
+    const next: string[] = [];
+    for (let i = 0; i < current.length; i += 2) {
+      next.push(serverHash(current[i] + current[i + 1]));
+    }
+    tree.push(next);
+    current = next;
+  }
+
+  return { root: current[0], tree };
+}
+
 // ─── API Handlers ───
 
 export async function POST(request: Request) {
@@ -124,16 +172,35 @@ export async function POST(request: Request) {
     const standardDeck = createStandardDeckAbbreviated();
     const shuffledDeck = seededShuffle(standardDeck, serverSeed, clientSeed, nonce);
 
-    // Store the server seed for later revelation
-    pendingSeeds.set(roundId, { serverSeed, clientSeed, nonce, createdAt: Date.now() });
+    // Build Merkle tree for the shuffled deck
+    const leafHashes = shuffledDeck.map((card, idx) => serverHash(`${idx}:${card}`));
+    const { root: merkleRoot, tree: merkleTree } = buildMerkleTree(leafHashes);
 
-    // Return commitment (NOT the serverSeed) + shuffled deck
+    // Store the round data (including deck and merkle tree) on the server
+    // Client never sees the deck or merkle tree during play
+    pendingSeeds.set(roundId, {
+      serverSeed,
+      clientSeed,
+      nonce,
+      shuffledDeck,
+      merkleTree,
+      leafHashes,
+      nextPosition: 0,
+      createdAt: Date.now(),
+      revealed: false,
+    });
+
+    // Return commitment — CRITICALLY: NO shuffledDeck, NO merkleTree
     return NextResponse.json({
       roundId,
       serverSeedHash,
       clientSeed,
       nonce,
-      shuffledDeck,
+      // Phase 3 compatibility: deck NOT sent during play
+      shuffledDeck: [],
+      // ZK-compatible additions
+      merkleRoot,
+      deckSize: shuffledDeck.length,
     });
   } catch {
     return NextResponse.json(
@@ -155,25 +222,35 @@ export async function PUT(request: Request) {
       );
     }
 
-    const seedData = pendingSeeds.get(roundId);
-    if (!seedData) {
+    const roundData = pendingSeeds.get(roundId);
+    if (!roundData) {
       return NextResponse.json(
         { error: 'Seed not found or already revealed' },
         { status: 404 }
       );
     }
 
-    // Reveal the server seed and remove from pending
-    const serverSeed = seedData.serverSeed;
-    const clientSeed = seedData.clientSeed;
-    const nonce = seedData.nonce;
-    pendingSeeds.delete(roundId);
+    if (roundData.revealed) {
+      return NextResponse.json(
+        { error: 'Round already revealed' },
+        { status: 410 }
+      );
+    }
 
+    // Mark as revealed
+    roundData.revealed = true;
+
+    const { serverSeed, clientSeed, nonce, shuffledDeck } = roundData;
+
+    // NOW we can send the full deck — round is over
+    // Client can verify: SHA-256(serverSeed) === serverSeedHash
+    // AND re-shuffling produces the same deck
     return NextResponse.json({
       serverSeed,
       roundId,
       clientSeed,
       nonce,
+      shuffledDeck,
     });
   } catch {
     return NextResponse.json(
@@ -182,3 +259,38 @@ export async function PUT(request: Request) {
     );
   }
 }
+
+// ─── GET: Get public verification data ──────────────────────────────
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const roundId = searchParams.get('roundId');
+
+    if (!roundId) {
+      return NextResponse.json({ error: 'roundId is required' }, { status: 400 });
+    }
+
+    const roundData = pendingSeeds.get(roundId);
+    if (!roundData) {
+      return NextResponse.json({ error: 'Round not found or already revealed' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      roundId,
+      merkleRoot: roundData.merkleTree[roundData.merkleTree.length - 1][0],
+      deckSize: roundData.shuffledDeck.length,
+      dealtCount: roundData.nextPosition,
+      exists: true,
+    });
+  } catch {
+    return NextResponse.json(
+      { error: 'Failed to get round data' },
+      { status: 500 }
+    );
+  }
+}
+
+// ─── Export the store for the /api/seed/deal route ──────────────────
+// We use globalThis so the /api/seed/deal route can access the same store
+export { pendingSeeds as seedRounds };

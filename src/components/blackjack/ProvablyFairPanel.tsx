@@ -181,7 +181,7 @@ export function ProvablyFairPanel() {
             </p>
           </div>
 
-          {/* First 5 cards dealt (prominent) */}
+          {/* First 5 cards dealt (prominent) — only shown AFTER round reveal */}
           {seedCommitment && firstFiveCards.length > 0 && (
             <div className="bg-gray-800/40 rounded-xl p-3 space-y-1.5">
               <span className="text-[10px] text-gray-500 uppercase tracking-wider">First 5 Cards Dealt</span>
@@ -268,20 +268,24 @@ export function ProvablyFairPanel() {
                 </div>
               </div>
 
-              {/* View Deck Order */}
+              {/* View Deck Order — hidden during play (ZK), revealed after round */}
               <div className="bg-gray-800/40 rounded-xl overflow-hidden">
                 <button
                   className="w-full flex items-center justify-between p-3 text-left"
                   onClick={() => setShowDeckOrder(!showDeckOrder)}
                 >
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wider">Deck Order ({seedCommitment.shuffledDeck?.length || 312} cards)</span>
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wider">
+                    Deck Order {seedCommitment.shuffledDeck && seedCommitment.shuffledDeck.length > 0
+                      ? `(${seedCommitment.shuffledDeck.length} cards)`
+                      : '(hidden during play)'}
+                  </span>
                   {showDeckOrder ? (
                     <ChevronUp className="w-3 h-3 text-gray-500" />
                   ) : (
                     <ChevronDown className="w-3 h-3 text-gray-500" />
                   )}
                 </button>
-                {showDeckOrder && seedCommitment.shuffledDeck && (
+                {showDeckOrder && seedCommitment.shuffledDeck && seedCommitment.shuffledDeck.length > 0 && (
                   <div className="px-3 pb-3">
                     <div className="max-h-32 overflow-y-auto bg-gray-900/60 rounded-lg p-2">
                       <div className="font-mono text-[9px] text-gray-500 leading-relaxed break-all">
@@ -297,6 +301,14 @@ export function ProvablyFairPanel() {
                       <Copy className="w-2.5 h-2.5 mr-1" />
                       {copiedField === 'deckOrder' ? 'Copied!' : 'Copy deck order'}
                     </Button>
+                  </div>
+                )}
+                {showDeckOrder && (!seedCommitment.shuffledDeck || seedCommitment.shuffledDeck.length === 0) && (
+                  <div className="px-3 pb-3">
+                    <div className="bg-gray-900/40 rounded-lg p-2 text-center">
+                      <Lock className="w-3 h-3 text-emerald-400 mx-auto mb-1" />
+                      <p className="text-[9px] text-gray-500">Deck order is hidden during play (Zero Knowledge). Verify the round to reveal.</p>
+                    </div>
                   </div>
                 )}
               </div>
