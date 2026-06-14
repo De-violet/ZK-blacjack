@@ -4,6 +4,7 @@ import { useGameStore } from '@/store/game-store';
 import { X, ShieldCheck, TreePine, Key, Layers, ChevronDown, ChevronUp, Check, AlertTriangle, Copy, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useCallback } from 'react';
+import { ZKVisualization } from './ZKVisualization';
 
 export function ZKProofPanel() {
   const {
@@ -33,7 +34,6 @@ export function ZKProofPanel() {
 
   const handleFetchProofs = useCallback(async () => {
     if (!seedCommitment) return;
-    // Fetch proofs for the first 5 cards (initial deal)
     await fetchCardProofs([0, 1, 2, 3, 4]);
   }, [seedCommitment, fetchCardProofs]);
 
@@ -60,9 +60,9 @@ export function ZKProofPanel() {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={toggleZKPanel} />
 
       {/* Panel */}
-      <div className="relative w-full max-w-sm bg-gray-900/95 backdrop-blur-md border-l border-gray-700/40 overflow-y-auto shadow-2xl">
+      <div className="relative w-full max-w-md bg-gray-900/95 backdrop-blur-md border-l border-gray-700/40 overflow-y-auto shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-3 border-b border-gray-800/60">
+        <div className="flex items-center justify-between p-3 border-b border-gray-800/60 sticky top-0 bg-gray-900/95 z-10">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-violet-400" />
             <h2 className="text-sm font-bold text-white">ZK Proofs</h2>
@@ -98,16 +98,8 @@ export function ZKProofPanel() {
             </button>
           </div>
 
-          {/* ZK Explanation */}
-          <div className="bg-violet-900/10 border border-violet-700/20 rounded-xl p-3">
-            <h3 className="text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1.5">How ZK Proofs Work</h3>
-            <ul className="space-y-1 text-[9px] text-gray-500 leading-relaxed">
-              <li className="flex gap-1.5"><span className="text-violet-400">1.</span><b className="text-gray-400">Merkle Tree</b> — Deck committed as a Merkle root. Each card&apos;s position can be proven without revealing the full deck.</li>
-              <li className="flex gap-1.5"><span className="text-violet-400">2.</span><b className="text-gray-400">VRF</b> — Verifiable Random Function proves shuffle randomness was derived from the committed seed.</li>
-              <li className="flex gap-1.5"><span className="text-violet-400">3.</span><b className="text-gray-400">Range Proof</b> — Proves card positions are within valid range [0, 311] without revealing exact positions.</li>
-              <li className="flex gap-1.5"><span className="text-violet-400">4.</span><b className="text-gray-400">Shuffle Proof</b> — After reveal, proves Fisher-Yates was applied correctly.</li>
-            </ul>
-          </div>
+          {/* ── ZK Visualization (NEW) ── */}
+          <ZKVisualization />
 
           {!zkCommitment ? (
             <div className="text-center py-6">
@@ -144,7 +136,7 @@ export function ZKProofPanel() {
                     </button>
                   </div>
                   <p className="text-[8px] text-gray-600">
-                    {zkCommitment.deckSize} cards committed • {zkCommitment.deckSize} Merkle leaves
+                    {zkCommitment.deckSize} cards committed - {zkCommitment.deckSize} Merkle leaves
                   </p>
 
                   {showMerkleDetail && (
@@ -251,8 +243,8 @@ export function ZKProofPanel() {
                                 <span className="text-[8px] text-gray-500">pos {proof.position}</span>
                               </div>
                               <div className="flex items-center gap-1">
-                                <span className="text-[8px] text-emerald-400">✓ Merkle</span>
-                                <span className="text-[8px] text-violet-400">✓ Range</span>
+                                <span className="text-[8px] text-emerald-400">Merkle</span>
+                                <span className="text-[8px] text-violet-400">Range</span>
                               </div>
                             </div>
                             <div className="mt-1 text-[7px] text-gray-600 font-mono">
@@ -272,7 +264,7 @@ export function ZKProofPanel() {
                   <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Verification</h3>
                   {zkVerification && (
                     <span className={`text-[9px] font-bold ${zkVerification.verified ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {zkVerification.verified ? '✓ Verified' : '✗ Failed'}
+                      {zkVerification.verified ? 'Verified' : 'Failed'}
                     </span>
                   )}
                 </div>
@@ -326,13 +318,6 @@ export function ZKProofPanel() {
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* Phase 3 Compatibility */}
-              <div className="bg-gray-800/20 rounded-xl p-2">
-                <p className="text-[8px] text-gray-600 text-center">
-                  Phase 4 extends Phase 3 — hash commitment verification still works via the Provably Fair panel
-                </p>
               </div>
             </>
           )}

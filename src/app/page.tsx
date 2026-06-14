@@ -8,6 +8,7 @@ import { StatsPanel } from '@/components/blackjack/StatsPanel';
 import { ProvablyFairPanel } from '@/components/blackjack/ProvablyFairPanel';
 import { ZKProofPanel } from '@/components/blackjack/ZKProofPanel';
 import { ZKSidePanel } from '@/components/blackjack/ZKSidePanel';
+import { ZKLiveIndicator } from '@/components/blackjack/ZKVisualization';
 import { Button } from '@/components/ui/button';
 import { Wallet, BarChart3, RotateCcw, Volume2, VolumeX, Shield, HelpCircle, X, ShieldCheck } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -266,6 +267,8 @@ export default function Home() {
           {/* Divider with bet display */}
           <div className="w-full max-w-xs mx-auto flex flex-col items-center flex-shrink-0">
             <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-600/25 to-transparent" />
+            {/* ZK Live Indicator */}
+            <ZKLiveIndicator />
             {currentBet > 0 && phase !== 'betting' && (
               <div
                 key={`bet-${currentBet}-${phase}`}

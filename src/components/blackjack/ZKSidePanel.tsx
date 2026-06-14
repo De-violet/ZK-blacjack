@@ -2,6 +2,7 @@
 
 import { useGameStore } from '@/store/game-store';
 import { ShieldCheck, TreePine, Key, Layers, Check, AlertTriangle, Zap, Shield, Lock, Unlock, Eye, Hash } from 'lucide-react';
+import { ZKVisualization } from './ZKVisualization';
 
 export function ZKSidePanel() {
   const {
@@ -23,7 +24,10 @@ export function ZKSidePanel() {
   return (
     <div className="h-full flex flex-col gap-3 overflow-y-auto py-3 px-3 text-white">
 
-      {/* ── ZK Status Card ── */}
+      {/* ── ZK Visualization (NEW) ── */}
+      <ZKVisualization />
+
+      {/* ── ZK Status Card (Compact) ── */}
       <div className={`rounded-xl p-3 border ${
         zkEnabled
           ? 'bg-violet-950/50 border-violet-500/30'
@@ -43,15 +47,15 @@ export function ZKSidePanel() {
           </span>
         </div>
 
-        {zkEnabled ? (
-          <div className="space-y-2">
+        {zkEnabled && zkCommitment ? (
+          <div className="space-y-1.5">
             {/* Merkle Root */}
             <div className="flex items-center gap-2 bg-gray-900/50 rounded-lg p-2">
               <TreePine className="w-3 h-3 text-emerald-400 flex-shrink-0" />
               <div className="min-w-0">
                 <div className="text-[8px] text-gray-500 uppercase tracking-wider">Merkle Root</div>
                 <code className="text-[9px] text-emerald-300/80 font-mono break-all">
-                  {zkCommitment ? truncateHash(zkCommitment.merkleRoot) : 'Waiting...'}
+                  {truncateHash(zkCommitment.merkleRoot)}
                 </code>
               </div>
             </div>
@@ -62,7 +66,7 @@ export function ZKSidePanel() {
               <div className="min-w-0">
                 <div className="text-[8px] text-gray-500 uppercase tracking-wider">VRF Output</div>
                 <code className="text-[9px] text-amber-300/80 font-mono break-all">
-                  {zkCommitment ? truncateHash(zkCommitment.vrfProof.vrfOutput) : 'Waiting...'}
+                  {truncateHash(zkCommitment.vrfProof.vrfOutput)}
                 </code>
               </div>
             </div>
@@ -231,28 +235,6 @@ export function ZKSidePanel() {
         </div>
       )}
 
-      {/* ── How ZK Works ── */}
-      <div className="rounded-xl p-3 bg-violet-950/20 border border-violet-500/10">
-        <div className="flex items-center gap-2 mb-2">
-          <Shield className="w-3.5 h-3.5 text-violet-400" />
-          <span className="text-[10px] font-bold text-violet-300">How ZK Proofs Work</span>
-        </div>
-        <div className="space-y-1.5 text-[9px] text-gray-500 leading-relaxed">
-          <div className="flex gap-1.5">
-            <span className="text-violet-400 font-bold">1.</span>
-            <span><b className="text-gray-400">Commit</b> — Server commits to a shuffled deck via Merkle root hash before dealing</span>
-          </div>
-          <div className="flex gap-1.5">
-            <span className="text-violet-400 font-bold">2.</span>
-            <span><b className="text-gray-400">Prove</b> — Each dealt card comes with a Merkle proof (position) + VRF proof (randomness)</span>
-          </div>
-          <div className="flex gap-1.5">
-            <span className="text-violet-400 font-bold">3.</span>
-            <span><b className="text-gray-400">Verify</b> — After the round, seed is revealed to fully verify shuffle fairness</span>
-          </div>
-        </div>
-      </div>
-
       {/* ── Spacer ── */}
       <div className="flex-1" />
 
@@ -262,7 +244,7 @@ export function ZKSidePanel() {
           Powered by <span className="text-violet-400">Zero-Knowledge Proofs</span>
         </div>
         <div className="text-[7px] text-gray-700 mt-0.5">
-          Merkle Tree • VRF • Range Proofs • Shuffle Proofs
+          Merkle Tree - VRF - Range Proofs - Shuffle Proofs
         </div>
       </div>
     </div>

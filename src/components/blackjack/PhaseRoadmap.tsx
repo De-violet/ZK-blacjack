@@ -49,7 +49,7 @@ const phases: Phase[] = [
     name: 'ZK Proofs',
     shortName: 'ZK',
     description: 'Zero-knowledge proof verification',
-    status: 'upcoming',
+    status: 'completed',
     icon: <FileCode className="w-3.5 h-3.5" />,
     completedIcon: <Check className="w-3.5 h-3.5" />,
   },

@@ -459,3 +459,46 @@ button, [role="button"], a, input, select, textarea {
   0% { transform: translateX(100%); opacity: 0; }
   100% { transform: translateX(0); opacity: 1; }
 }
+
+/* ─── ZK Visualization animations ────────────────────────────── */
+@keyframes zk-proof-pulse {
+  0%, 100% { box-shadow: 0 0 4px 1px rgba(139, 92, 246, 0.2); }
+  50% { box-shadow: 0 0 12px 3px rgba(139, 92, 246, 0.5); }
+}
+
+@keyframes zk-merkle-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.3)); }
+  50% { filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.7)); }
+}
+
+@keyframes zk-root-pulse {
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(139, 92, 246, 0.3); }
+  50% { box-shadow: 0 0 18px 4px rgba(139, 92, 246, 0.6); }
+}
+
+@keyframes zk-verify-success {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes zk-hash-flow {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+@keyframes zk-node-appear {
+  0% { transform: scale(0); opacity: 0; }
+  70% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes zk-line-draw {
+  0% { stroke-dashoffset: 100; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes zk-shimmer-bg {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
