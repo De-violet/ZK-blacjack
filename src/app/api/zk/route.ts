@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createHash, randomBytes } from 'crypto';
 
-// Phase 4: Zero-Knowledge Proof API
-// Extends Phase 3's seed commitment with Merkle tree, VRF, and range proofs
+// Phase 4: Zero-Knowledge Proof API — GENUINE IMPLEMENTATION
 //
-// POST /api/zk — Generate ZK commitment (Merkle root + VRF proof) along with seed commitment
-// PUT /api/zk  — Reveal server seed + shuffle proof, or generate Merkle proofs for card positions
+// KEY FIX: The shuffled deck is NEVER sent to the client before the round ends.
+// Cards are dealt one at a time from the server, each with a Merkle inclusion proof.
+//
+// POST /api/zk — Generate ZK commitment (merkleRoot + vrfProof, NO deck)
+// PUT /api/zk  — Reveal server seed + shuffle proof + full deck (after round)
 // GET /api/zk  — Get public verification data for a round
 
-// ─── In-Memory Store ────────────────────────────────────────────────
+// ─── In-Memory Store (shared via globalThis for multi-route access) ─
 
 interface ZKRoundData {
   serverSeed: string;
@@ -17,10 +19,20 @@ interface ZKRoundData {
   shuffledDeck: string[];
   merkleTree: string[][];
   leafHashes: string[];
+  nextPosition: number; // Tracks which card to deal next
   createdAt: number;
+  revealed: boolean;
 }
 
-const zkRounds = new Map<string, ZKRoundData>();
+// Use globalThis so the /api/zk/deal route can access the same store
+const getZkRounds = (): Map<string, ZKRoundData> => {
+  if (!(globalThis as Record<string, unknown>).__zkRounds) {
+    (globalThis as Record<string, unknown>).__zkRounds = new Map<string, ZKRoundData>();
+  }
+  return (globalThis as Record<string, unknown>).__zkRounds as Map<string, ZKRoundData>;
+};
+
+const zkRounds = getZkRounds();
 
 // Cleanup old rounds (>1 hour)
 function cleanup() {
@@ -154,7 +166,17 @@ function createStandardDeckAbbreviated(): string[] {
   return deck;
 }
 
-// ─── POST: Generate ZK Commitment ───────────────────────────────────
+function seededShuffle(array: string[], serverSeed: string, clientSeed: string, nonce: number): string[] {
+  const rng = new SeededRNG(serverSeed, clientSeed, nonce);
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = rng.nextInt(i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+// ─── POST: Generate ZK Commitment (NO DECK SENT) ──────────────────
 
 export async function POST(request: Request) {
   try {
@@ -171,11 +193,12 @@ export async function POST(request: Request) {
     // Server seed hash (Phase 3 compatibility)
     const serverSeedHash = hash(serverSeed);
 
-    // Shuffle the deck
+    // Shuffle the deck server-side
     const standardDeck = createStandardDeckAbbreviated();
     const shuffledDeck = seededShuffle(standardDeck, serverSeed, clientSeed, nonce);
 
     // Build Merkle tree of shuffled deck
+    // Leaf format: SHA-256("position:card") e.g. SHA-256("0:Ah")
     const leaves = shuffledDeck.map((card, idx) => hash(`${idx}:${card}`));
     const { root: merkleRoot, tree: merkleTree } = await buildMerkleTree(leaves);
 
@@ -185,7 +208,7 @@ export async function POST(request: Request) {
     // Compute deck hash for additional verification
     const deckHash = hash(shuffledDeck.join(','));
 
-    // Store the round data
+    // Store the round data ON THE SERVER — client never sees the deck
     zkRounds.set(roundId, {
       serverSeed,
       clientSeed,
@@ -193,27 +216,27 @@ export async function POST(request: Request) {
       shuffledDeck,
       merkleTree,
       leafHashes: leaves,
+      nextPosition: 0, // Start dealing from position 0
       createdAt: Date.now(),
+      revealed: false,
     });
 
-    // Also store in the Phase 3 seed store for backward compatibility
-    // (the /api/seed route has its own store)
-
-    // Return ZK commitment (NOT the serverSeed, NOT the full Merkle tree)
+    // Return ZK commitment — CRITICALLY: NO shuffledDeck, NO merkleTree
     return NextResponse.json({
-      // Phase 3 compatibility
       roundId,
       serverSeedHash,
       clientSeed,
       nonce,
-      shuffledDeck,
-
       // Phase 4 additions
       zkCommitment: {
+        roundId,
         merkleRoot,
         vrfProof,
         deckSize: shuffledDeck.length,
         deckHash,
+        serverSeedHash,
+        clientSeed,
+        nonce,
       },
     });
   } catch {
@@ -224,26 +247,12 @@ export async function POST(request: Request) {
   }
 }
 
-// Seeded shuffle (same as Phase 3)
-function seededShuffle(array: string[], serverSeed: string, clientSeed: string, nonce: number): string[] {
-  const rng = new SeededRNG(serverSeed, clientSeed, nonce);
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = rng.nextInt(i + 1);
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
-
-// ─── PUT: Reveal seed or generate card proofs ───────────────────────
+// ─── PUT: Reveal seed + full deck (ONLY after round ends) ────────
 
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { roundId, cardPositions } = body as {
-      roundId?: string;
-      cardPositions?: number[];
-    };
+    const { roundId } = body as { roundId?: string };
 
     if (!roundId) {
       return NextResponse.json({ error: 'roundId is required' }, { status: 400 });
@@ -254,56 +263,40 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Round not found' }, { status: 404 });
     }
 
-    // If cardPositions provided, generate Merkle proofs for those positions
-    if (cardPositions && cardPositions.length > 0) {
-      const { merkleTree, shuffledDeck } = roundData;
-      const cardProofs = cardPositions.map((pos: number) => {
-        const card = shuffledDeck[pos];
-        const { siblings, path } = generateMerkleProof(merkleTree, pos);
-
-        return {
-          card,
-          position: pos,
-          merkleProof: {
-            leafHash: merkleTree[0][pos],
-            leafIndex: pos,
-            root: merkleTree[merkleTree.length - 1][0],
-            siblings,
-            path,
-          },
-          rangeProof: {
-            commitment: hash(`${pos}:zk-range-salt`),
-            revealedIndex: undefined,
-            proof: 'zk-range-salt',
-            max: shuffledDeck.length,
-          },
-        };
-      });
-
-      return NextResponse.json({
-        roundId,
-        cardProofs,
-      });
+    if (roundData.revealed) {
+      return NextResponse.json({ error: 'Round already revealed' }, { status: 410 });
     }
 
-    // No cardPositions — reveal the server seed and shuffle proof
+    // Mark as revealed
+    roundData.revealed = true;
+
     const { serverSeed, clientSeed, nonce, shuffledDeck } = roundData;
 
-    // Generate shuffle proof steps
+    // Generate genuine shuffle proof with hash commitments
     const originalDeck = createStandardDeckAbbreviated();
     const simRng = new SeededRNG(serverSeed, clientSeed, nonce);
     const simDeck = [...originalDeck];
     const shuffleSteps: { i: number; j: number; swapCommitment: string; cardI: string; cardJ: string }[] = [];
     for (let i = simDeck.length - 1; i > 0; i--) {
       const j = simRng.nextInt(i + 1);
+      // Genuine commitment: hash the swap data BEFORE the swap
+      const swapCommitment = hash(`${i}:${j}:${simDeck[i]}:${simDeck[j]}`);
       shuffleSteps.push({
         i,
         j,
-        swapCommitment: hash(`${i}:${j}:${simDeck[i]}:${simDeck[j]}`),
+        swapCommitment,
         cardI: simDeck[i],
         cardJ: simDeck[j],
       });
       [simDeck[i], simDeck[j]] = [simDeck[j], simDeck[i]];
+    }
+
+    // Generate range proof salts for all dealt positions
+    const dealtPositions: { position: number; salt: string }[] = [];
+    for (let pos = 0; pos < roundData.nextPosition; pos++) {
+      // Use a deterministic salt derived from the server seed and position
+      const salt = hash(`${serverSeed}:range-salt:${pos}`);
+      dealtPositions.push({ position: pos, salt });
     }
 
     return NextResponse.json({
@@ -311,7 +304,12 @@ export async function PUT(request: Request) {
       roundId,
       clientSeed,
       nonce,
+      // NOW we can send the full deck — round is over
+      shuffledDeck,
+      // Shuffle proof with genuine commitments
       shuffleProof: shuffleSteps,
+      // Range proof salts for verification
+      rangeProofSalts: dealtPositions,
     });
   } catch {
     return NextResponse.json(
@@ -341,6 +339,7 @@ export async function GET(request: Request) {
       roundId,
       merkleRoot: roundData.merkleTree[roundData.merkleTree.length - 1][0],
       deckSize: roundData.shuffledDeck.length,
+      dealtCount: roundData.nextPosition,
       exists: true,
     });
   } catch {

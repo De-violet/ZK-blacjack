@@ -20,7 +20,9 @@ export interface SeedCommitment {
   clientSeed: string;
   /** A nonce to ensure uniqueness across rounds */
   nonce: number;
-  /** Shuffled deck order from server (abbreviated format like "Ah", "10d") */
+  /** Shuffled deck order — ONLY available after round ends (seed reveal).
+   *  During the game, this is EMPTY [] for genuine ZK.
+   *  After the round, the reveal API provides the full deck for verification. */
   shuffledDeck: string[];
 }
 

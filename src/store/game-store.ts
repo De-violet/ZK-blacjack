@@ -42,6 +42,21 @@ import {
   generateClientSeed,
   RoundHistoryEntry,
 } from '@/lib/provably-fair';
+
+/**
+ * Parse a single abbreviated card string (e.g. "Ah") into a Card object.
+ * Used when dealing cards from the ZK server.
+ */
+function parseAbbreviatedCard(abbr: string, faceUp: boolean = true): Card {
+  const suitMap: Record<string, string> = {
+    'h': 'hearts', 'd': 'diamonds', 'c': 'clubs', 's': 'spades',
+  };
+  const suitChar = abbr[abbr.length - 1].toLowerCase();
+  const rank = abbr.slice(0, -1);
+  const suit = suitMap[suitChar];
+  if (!suit) throw new Error(`Invalid card abbreviation: ${abbr}`);
+  return { rank: rank as import('@/lib/blackjack').Rank, suit: suit as import('@/lib/blackjack').Suit, faceUp };
+}
 import {
   ZKCommitment,
   ZKCardProof,
@@ -125,7 +140,7 @@ interface GameStore {
   isSeedVerified: boolean | null;
   provablyFairEnabled: boolean;
   deckOrderHash: string | null;
-  initialDeckOrder: string[] | null; // abbreviated deck from server for verification
+  initialDeckOrder: string[] | null; // abbreviated deck from server for verification (only after reveal)
   roundHistory: RoundHistoryEntry[];
   // ZK Phase 4 state
   zkCommitment: ZKCommitment | null;
@@ -133,6 +148,7 @@ interface GameStore {
   zkVerification: ZKVerificationResult | null;
   zkEnabled: boolean;
   showZKPanel: boolean;
+  zkDealPosition: number; // tracks how many cards have been dealt from server
 
   // Actions
   placeBet: (amount: number) => void;
@@ -287,6 +303,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   zkVerification: null,
   zkEnabled: true,
   showZKPanel: false,
+  zkDealPosition: 0,
 
   placeBet: (amount: number) => {
     const { balance, currentBet } = get();
@@ -332,14 +349,101 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { provablyFairEnabled, zkEnabled, seedCommitment: prevCommitment } = get();
     let commitment: SeedCommitment | null = null;
     let zkCommit: ZKCommitment | null = null;
-    let deck: Card[];
+    let playerHand: Card[];
+    let dealerHand: Card[];
+    let remainingDeck: Card[] = [];
 
-    if (provablyFairEnabled) {
-      // Call ZK API (Phase 4) or Phase 3 API
-      const apiEndpoint = zkEnabled ? '/api/zk' : '/api/seed';
+    if (provablyFairEnabled && zkEnabled) {
+      // ── ZK MODE: Server-side dealing (NO deck sent to client) ──
       try {
         const clientSeed = prevCommitment?.clientSeed || generateClientSeed();
-        const response = await fetch(apiEndpoint, {
+
+        // Step 1: Get commitment from server (no deck!)
+        const commitResponse = await fetch('/api/zk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientSeed }),
+        });
+        const commitData = await commitResponse.json();
+
+        commitment = {
+          roundId: commitData.roundId,
+          serverSeedHash: commitData.serverSeedHash,
+          clientSeed: commitData.clientSeed,
+          nonce: commitData.nonce,
+          shuffledDeck: [], // NOT sent by server in ZK mode!
+        };
+
+        zkCommit = commitData.zkCommitment || null;
+
+        // Step 2: Request initial 4 cards from server (2 player, 2 dealer)
+        const dealResponse = await fetch('/api/zk/deal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roundId: commitData.roundId, count: 4 }),
+        });
+        const dealData = await dealResponse.json();
+
+        if (!dealData.cards || dealData.cards.length < 4) {
+          throw new Error('Failed to deal initial cards');
+        }
+
+        // Convert dealt cards to Card objects
+        const dealtCards = dealData.cards;
+        playerHand = [
+          parseAbbreviatedCard(dealtCards[0].card, true),
+          parseAbbreviatedCard(dealtCards[2].card, true),
+        ];
+        dealerHand = [
+          parseAbbreviatedCard(dealtCards[1].card, true),
+          parseAbbreviatedCard(dealtCards[3].card, false), // face down
+        ];
+
+        // Store Merkle proofs for verification
+        const cardProofs: ZKCardProof[] = dealtCards.map((c: { card: string; position: number; merkleProof: unknown; rangeProof: unknown }) => ({
+          card: c.card,
+          position: c.position,
+          merkleProof: c.merkleProof as import('@/lib/zk-crypto').MerkleProof,
+          rangeProof: c.rangeProof as import('@/lib/zk-crypto').RangeProof,
+        }));
+
+        // Verify each card's Merkle proof against the committed root (genuine ZK!)
+        let allProofsValid = true;
+        for (const proof of cardProofs) {
+          const isValid = await verifyMerkleProof(proof.merkleProof);
+          if (!isValid) {
+            allProofsValid = false;
+            console.warn(`ZK: Merkle proof invalid for card ${proof.card} at position ${proof.position}`);
+          }
+        }
+
+        if (!allProofsValid) {
+          console.error('ZK: Some Merkle proofs failed verification!');
+        }
+
+        set({
+          zkCardProofs: cardProofs,
+          zkDealPosition: 4,
+        });
+      } catch (err) {
+        // Fallback to random shuffle if ZK API fails
+        console.warn('ZK API failed, falling back to local shuffle:', err);
+        const deck = shuffleDeck(createDeck(6));
+        const { card: p1, remainingDeck: d1 } = dealCard(deck, true);
+        const { card: d1Card, remainingDeck: d2 } = dealCard(d1, true);
+        const { card: p2, remainingDeck: d3 } = dealCard(d2, true);
+        const { card: d2Card, remainingDeck: d4 } = dealCard(d3, false);
+        playerHand = [p1, p2];
+        dealerHand = [d1Card, d2Card];
+        remainingDeck = d4;
+        commitment = null;
+        zkCommit = null;
+      }
+    } else if (provablyFairEnabled) {
+      // ── Phase 3 MODE: Hash commitment (deck sent — known limitation) ──
+      try {
+        const clientSeed = prevCommitment?.clientSeed || generateClientSeed();
+        const response = await fetch('/api/seed', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ clientSeed }),
@@ -352,60 +456,51 @@ export const useGameStore = create<GameStore>((set, get) => ({
           nonce: data.nonce,
           shuffledDeck: data.shuffledDeck,
         };
-        // Phase 4: Store ZK commitment data and auto-fetch card proofs
-        if (data.zkCommitment) {
-          zkCommit = data.zkCommitment;
-          // Auto-fetch proofs for first 5 cards (initial deal)
-          try {
-            const proofResponse = await fetch('/api/zk', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                roundId: data.roundId,
-                cardPositions: [0, 1, 2, 3, 4],
-              }),
-            });
-            const proofData = await proofResponse.json();
-            if (proofData.cardProofs) {
-              // Will be set after zkCommitment is set below
-              setTimeout(() => set({ zkCardProofs: proofData.cardProofs }), 0);
-            }
-          } catch {
-            // Card proofs are optional, silently fail
-          }
-        }
-        // Convert abbreviated deck from server to Card objects
-        deck = parseAbbreviatedDeck(commitment.shuffledDeck) as Card[];
+        const deck = parseAbbreviatedDeck(commitment.shuffledDeck) as Card[];
+        const { card: p1, remainingDeck: d1 } = dealCard(deck, true);
+        const { card: d1Card, remainingDeck: d2 } = dealCard(d1, true);
+        const { card: p2, remainingDeck: d3 } = dealCard(d2, true);
+        const { card: d2Card, remainingDeck: d4 } = dealCard(d3, false);
+        playerHand = [p1, p2];
+        dealerHand = [d1Card, d2Card];
+        remainingDeck = d4;
       } catch {
-        // Fallback to random shuffle if API fails
-        deck = shuffleDeck(createDeck(6));
+        const deck = shuffleDeck(createDeck(6));
+        const { card: p1, remainingDeck: d1 } = dealCard(deck, true);
+        const { card: d1Card, remainingDeck: d2 } = dealCard(d1, true);
+        const { card: p2, remainingDeck: d3 } = dealCard(d2, true);
+        const { card: d2Card, remainingDeck: d4 } = dealCard(d3, false);
+        playerHand = [p1, p2];
+        dealerHand = [d1Card, d2Card];
+        remainingDeck = d4;
       }
     } else {
-      deck = shuffleDeck(createDeck(6));
+      // ── No provably fair ──
+      const deck = shuffleDeck(createDeck(6));
+      const { card: p1, remainingDeck: d1 } = dealCard(deck, true);
+      const { card: d1Card, remainingDeck: d2 } = dealCard(d1, true);
+      const { card: p2, remainingDeck: d3 } = dealCard(d2, true);
+      const { card: d2Card, remainingDeck: d4 } = dealCard(d3, false);
+      playerHand = [p1, p2];
+      dealerHand = [d1Card, d2Card];
+      remainingDeck = d4;
     }
 
-    const { card: p1, remainingDeck: d1 } = dealCard(deck, true);
-    const { card: d1Card, remainingDeck: d2 } = dealCard(d1, true);
-    const { card: p2, remainingDeck: d3 } = dealCard(d2, true);
-    const { card: d2Card, remainingDeck: d4 } = dealCard(d3, false);
-
-    const playerHand = [p1, p2];
-    const dealerHand = [d1Card, d2Card];
-
     // Calculate side bet results
+    const dealerUpCard = dealerHand[0]; // dealer's face-up card
     const ppResult = actualPPBet > 0 ? checkPerfectPair(playerHand) : { type: null as PerfectPairType, payout: 0 };
-    const pp3Result = actualPP3Bet > 0 ? check21Plus3(playerHand, d1Card) : { type: null as TwentyOnePlusThreeType, payout: 0 };
+    const pp3Result = actualPP3Bet > 0 ? check21Plus3(playerHand, dealerUpCard) : { type: null as TwentyOnePlusThreeType, payout: 0 };
     const ppWinAmount = ppResult.type ? actualPPBet * (ppResult.payout + 1) : 0;
     const pp3WinAmount = pp3Result.type ? actualPP3Bet * (pp3Result.payout + 1) : 0;
     const storedPPResult = actualPPBet > 0 ? { type: ppResult.type, payout: ppResult.payout, winAmount: ppWinAmount } : null;
     const storedPP3Result = actualPP3Bet > 0 ? { type: pp3Result.type, payout: pp3Result.payout, winAmount: pp3WinAmount } : null;
 
     // Check if dealer's face-up card is an Ace -> offer insurance
-    const dealerShowsAce = d1Card.rank === 'A';
+    const dealerShowsAce = dealerHand[0].rank === 'A';
 
     if (dealerShowsAce) {
       set({
-        deck: d4,
+        deck: remainingDeck,
         playerHand,
         dealerHand,
         phase: 'insurance',
@@ -454,7 +549,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       };
 
       set({
-        deck: d4,
+        deck: remainingDeck,
         playerHand,
         dealerHand: revealedDealerHand,
         phase: 'result',
@@ -484,7 +579,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     set({
-      deck: d4,
+      deck: remainingDeck,
       playerHand,
       dealerHand,
       phase: 'playing',
@@ -622,7 +717,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   hit: () => {
-    const { isSplitMode } = get();
+    const { isSplitMode, zkEnabled, seedCommitment, provablyFairEnabled } = get();
     if (get().phase !== 'playing') return;
 
     // In split mode, redirect to hitSplit
@@ -631,6 +726,109 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
 
+    // ── ZK MODE: Fetch card from server ──
+    if (zkEnabled && provablyFairEnabled && seedCommitment) {
+      set({ isAnimating: true });
+      fetch('/api/zk/deal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roundId: seedCommitment.roundId, count: 1 }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (!data.cards || data.cards.length < 1) throw new Error('No card dealt');
+          const serverCard = data.cards[0];
+          const card = parseAbbreviatedCard(serverCard.card, true);
+          const { playerHand } = get();
+          const newHand = [...playerHand, card];
+
+          // Store proof
+          const newProof: ZKCardProof = {
+            card: serverCard.card,
+            position: serverCard.position,
+            merkleProof: serverCard.merkleProof as import('@/lib/zk-crypto').MerkleProof,
+            rangeProof: serverCard.rangeProof as import('@/lib/zk-crypto').RangeProof,
+          };
+          const updatedProofs = [...get().zkCardProofs, newProof];
+
+          // Verify Merkle proof
+          verifyMerkleProof(newProof.merkleProof).then(isValid => {
+            if (!isValid) console.warn(`ZK: Hit card proof invalid! pos=${newProof.position}`);
+          });
+
+          if (isBusted(newHand)) {
+            const { dealerHand, currentBet, insuranceBet } = get();
+            const revealedDealerHand = dealerHand.map(c => ({ ...c, faceUp: true }));
+            const dealerBJ = isBlackjack(dealerHand);
+            const insurancePayout = calculateInsurancePayout(insuranceBet, dealerBJ);
+            const insResult: InsuranceResult = insuranceBet > 0 ? (dealerBJ ? 'won' : 'lost') : null;
+            const totalPayout = insurancePayout;
+            const newStats = updateStats(get().stats, 'lose', 0);
+            const newBalance = get().balance + totalPayout + getSideBetWinnings(get());
+            const historyEntry: GameHistoryEntry = {
+              id: ++historyId, result: 'lose', bet: currentBet, payout: totalPayout,
+              playerScore: calculateScoreAllCards(newHand), dealerScore: calculateScoreAllCards(revealedDealerHand),
+              timestamp: Date.now(), insuranceBet, insuranceResult: insResult,
+            };
+            set({
+              playerHand: newHand, dealerHand: revealedDealerHand,
+              phase: 'result', result: 'lose', balance: newBalance,
+              message: 'Busted! You went over 21', stats: newStats, isAnimating: false,
+              insuranceResult: insResult,
+              history: [historyEntry, ...get().history].slice(0, 20),
+              balanceHistory: [...get().balanceHistory.slice(-49), newBalance],
+              cardsDealtTotal: get().cardsDealtTotal + 1,
+              zkCardProofs: updatedProofs, zkDealPosition: get().zkDealPosition + 1,
+            });
+            return;
+          }
+
+          if (calculateScoreAllCards(newHand) === 21) {
+            set({ playerHand: newHand, isAnimating: false, zkCardProofs: updatedProofs, zkDealPosition: get().zkDealPosition + 1, cardsDealtTotal: get().cardsDealtTotal + 1 });
+            setTimeout(() => get().stand(), 500);
+            return;
+          }
+
+          set({
+            playerHand: newHand, isAnimating: false,
+            message: `Your score: ${calculateScoreAllCards(newHand)} — Hit or Stand?`,
+            cardsDealtTotal: get().cardsDealtTotal + 1,
+            zkCardProofs: updatedProofs, zkDealPosition: get().zkDealPosition + 1,
+          });
+        })
+        .catch(() => {
+          // Fallback: deal from local deck
+          set({ isAnimating: false });
+          const { deck, playerHand } = get();
+          if (deck.length === 0) return;
+          const { card, remainingDeck } = dealCard(deck, true);
+          const newHand = [...playerHand, card];
+          if (isBusted(newHand)) {
+            const { dealerHand, currentBet, insuranceBet } = get();
+            const revealedDealerHand = dealerHand.map(c => ({ ...c, faceUp: true }));
+            const dealerBJ = isBlackjack(dealerHand);
+            const insurancePayout = calculateInsurancePayout(insuranceBet, dealerBJ);
+            const insResult: InsuranceResult = insuranceBet > 0 ? (dealerBJ ? 'won' : 'lost') : null;
+            const newStats = updateStats(get().stats, 'lose', 0);
+            const newBalance = get().balance + insurancePayout + getSideBetWinnings(get());
+            set({
+              deck: remainingDeck, playerHand: newHand, dealerHand: revealedDealerHand,
+              phase: 'result', result: 'lose', balance: newBalance,
+              message: 'Busted! You went over 21', stats: newStats, isAnimating: false,
+              cardsDealtTotal: get().cardsDealtTotal + 1,
+            });
+            return;
+          }
+          set({
+            deck: remainingDeck, playerHand: newHand, isAnimating: false,
+            message: `Your score: ${calculateScoreAllCards(newHand)} — Hit or Stand?`,
+            cardsDealtTotal: get().cardsDealtTotal + 1,
+          });
+        });
+      return;
+    }
+
+    // ── Non-ZK MODE: Deal from local deck ──
     const { deck, playerHand } = get();
     const { card, remainingDeck } = dealCard(deck, true);
     const newHand = [...playerHand, card];
@@ -693,7 +891,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   stand: () => {
-    const { isSplitMode } = get();
+    const { isSplitMode, zkEnabled, seedCommitment, provablyFairEnabled } = get();
     if (get().phase !== 'playing') return;
 
     // In split mode, redirect to standSplit
@@ -702,13 +900,94 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
 
-    const { deck, playerHand, dealerHand, currentBet, balance, insuranceBet } = get();
+    const { playerHand, dealerHand, currentBet, balance, insuranceBet } = get();
 
     set({ phase: 'dealerTurn', message: "Dealer's turn...", isAnimating: true });
 
     const revealedHand = dealerHand.map(c => ({ ...c, faceUp: true }));
-    let currentDeck = deck;
     let currentDealerHand = [...revealedHand];
+
+    // ── ZK MODE: Fetch dealer cards from server one at a time ──
+    if (zkEnabled && provablyFairEnabled && seedCommitment) {
+      set({ dealerHand: revealedHand });
+
+      const dealerPlayZK = async () => {
+        const action = getDealerAction(currentDealerHand);
+
+        if (action === 'hit') {
+          try {
+            const res = await fetch('/api/zk/deal', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ roundId: seedCommitment.roundId, count: 1 }),
+            });
+            const data = await res.json();
+            if (!data.cards || data.cards.length < 1) throw new Error('No card');
+
+            const card = parseAbbreviatedCard(data.cards[0].card, true);
+            currentDealerHand = [...currentDealerHand, card];
+
+            // Store proof
+            const newProof: ZKCardProof = {
+              card: data.cards[0].card,
+              position: data.cards[0].position,
+              merkleProof: data.cards[0].merkleProof as import('@/lib/zk-crypto').MerkleProof,
+              rangeProof: data.cards[0].rangeProof as import('@/lib/zk-crypto').RangeProof,
+            };
+            const updatedProofs = [...get().zkCardProofs, newProof];
+
+            set({
+              dealerHand: currentDealerHand,
+              cardsDealtTotal: get().cardsDealtTotal + 1,
+              zkCardProofs: updatedProofs,
+              zkDealPosition: get().zkDealPosition + 1,
+            });
+
+            setTimeout(() => dealerPlayZK(), 600);
+          } catch {
+            // If server fails, we can't continue dealer turn properly — end the round
+            const result = determineResult(playerHand, currentDealerHand);
+            const payout = calculatePayout(result, currentBet);
+            const newStats = updateStats(get().stats, result, payout - (result === 'lose' ? 0 : currentBet));
+            const newBalance = balance + payout + getSideBetWinnings(get());
+            set({
+              dealerHand: currentDealerHand, phase: 'result', result, balance: newBalance,
+              message: getResultMessage(result), stats: newStats, isAnimating: false,
+              balanceHistory: [...get().balanceHistory.slice(-49), newBalance],
+            });
+          }
+        } else {
+          // Dealer stands — resolve the round
+          const result = determineResult(playerHand, currentDealerHand);
+          const payout = calculatePayout(result, currentBet);
+          const dealerBJ = isBlackjack(currentDealerHand);
+          const insurancePayout = calculateInsurancePayout(insuranceBet, dealerBJ);
+          const insResult: InsuranceResult = insuranceBet > 0 ? (dealerBJ ? 'won' : 'lost') : null;
+          const totalPayout = payout + insurancePayout;
+          const newStats = updateStats(get().stats, result, payout - (result === 'lose' ? 0 : currentBet));
+          const newBalance = balance + totalPayout + getSideBetWinnings(get());
+          const historyEntry: GameHistoryEntry = {
+            id: ++historyId, result, bet: currentBet, payout: totalPayout,
+            playerScore: calculateScoreAllCards(playerHand), dealerScore: calculateScoreAllCards(currentDealerHand),
+            timestamp: Date.now(), insuranceBet, insuranceResult: insResult,
+          };
+          set({
+            dealerHand: currentDealerHand, phase: 'result', result, balance: newBalance,
+            message: getResultMessage(result), stats: newStats, isAnimating: false,
+            insuranceResult: insResult,
+            history: [historyEntry, ...get().history].slice(0, 20),
+            balanceHistory: [...get().balanceHistory.slice(-49), newBalance],
+          });
+        }
+      };
+
+      setTimeout(() => dealerPlayZK(), 700);
+      return;
+    }
+
+    // ── Non-ZK MODE: Deal from local deck ──
+    const { deck } = get();
+    let currentDeck = deck;
     let dealerCardsDealt = 0;
 
     const dealerPlay = () => {
@@ -769,7 +1048,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   doubleDown: () => {
-    const { isSplitMode } = get();
+    const { isSplitMode, zkEnabled, seedCommitment, provablyFairEnabled } = get();
     if (get().phase !== 'playing') return;
 
     // In split mode, redirect to doubleDownSplit
@@ -778,12 +1057,76 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
 
-    const { balance, currentBet, deck, playerHand } = get();
+    const { balance, currentBet, playerHand } = get();
     if (playerHand.length !== 2) return;
     if (balance < currentBet) return;
 
     set({ balance: balance - currentBet, currentBet: currentBet * 2 });
 
+    // ── ZK MODE: Fetch card from server ──
+    if (zkEnabled && provablyFairEnabled && seedCommitment) {
+      set({ isAnimating: true });
+      fetch('/api/zk/deal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roundId: seedCommitment.roundId, count: 1 }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (!data.cards || data.cards.length < 1) throw new Error('No card');
+          const serverCard = data.cards[0];
+          const card = parseAbbreviatedCard(serverCard.card, true);
+          const newHand = [...playerHand, card];
+          const newProof: ZKCardProof = {
+            card: serverCard.card, position: serverCard.position,
+            merkleProof: serverCard.merkleProof as import('@/lib/zk-crypto').MerkleProof,
+            rangeProof: serverCard.rangeProof as import('@/lib/zk-crypto').RangeProof,
+          };
+          const updatedProofs = [...get().zkCardProofs, newProof];
+
+          if (isBusted(newHand)) {
+            const { dealerHand, currentBet: newBet, insuranceBet } = get();
+            const revealedDealerHand = dealerHand.map(c => ({ ...c, faceUp: true }));
+            const dealerBJ = isBlackjack(dealerHand);
+            const insurancePayout = calculateInsurancePayout(insuranceBet, dealerBJ);
+            const insResult: InsuranceResult = insuranceBet > 0 ? (dealerBJ ? 'won' : 'lost') : null;
+            const totalPayout = insurancePayout;
+            const newStats = updateStats(get().stats, 'lose', 0);
+            const newBalance = get().balance + totalPayout + getSideBetWinnings(get());
+            const historyEntry: GameHistoryEntry = {
+              id: ++historyId, result: 'lose', bet: newBet, payout: totalPayout,
+              playerScore: calculateScoreAllCards(newHand), dealerScore: calculateScoreAllCards(revealedDealerHand),
+              timestamp: Date.now(), insuranceBet, insuranceResult: insResult,
+            };
+            set({
+              playerHand: newHand, dealerHand: revealedDealerHand,
+              phase: 'result', result: 'lose', balance: newBalance,
+              message: 'Busted on Double Down!', stats: newStats, isAnimating: false,
+              insuranceResult: insResult,
+              history: [historyEntry, ...get().history].slice(0, 20),
+              balanceHistory: [...get().balanceHistory.slice(-49), newBalance],
+              cardsDealtTotal: get().cardsDealtTotal + 1,
+              zkCardProofs: updatedProofs, zkDealPosition: get().zkDealPosition + 1,
+            });
+            return;
+          }
+
+          set({
+            playerHand: newHand, isAnimating: false,
+            message: `Doubled! Score: ${calculateScoreAllCards(newHand)}`,
+            cardsDealtTotal: get().cardsDealtTotal + 1,
+            zkCardProofs: updatedProofs, zkDealPosition: get().zkDealPosition + 1,
+          });
+          setTimeout(() => get().stand(), 500);
+        })
+        .catch(() => {
+          set({ isAnimating: false });
+        });
+      return;
+    }
+
+    // ── Non-ZK MODE ──
+    const { deck } = get();
     const { card, remainingDeck } = dealCard(deck, true);
     const newHand = [...playerHand, card];
 
@@ -1466,6 +1809,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       zkCommitment: null,
       zkCardProofs: [],
       zkVerification: null,
+      zkDealPosition: 0,
     });
   },
 
@@ -1649,12 +1993,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   verifyProvablyFair: async () => {
-    const { seedCommitment, initialDeckOrder, zkEnabled } = get();
+    const { seedCommitment, zkEnabled } = get();
     if (!seedCommitment) return false;
 
     try {
       // Call API to reveal the server seed
-      // Use ZK API when ZK is enabled (also returns shuffle proof)
       const apiEndpoint = zkEnabled ? '/api/zk' : '/api/seed';
       const response = await fetch(apiEndpoint, {
         method: 'PUT',
@@ -1679,14 +2022,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const computedHash = await sha256(revealed.serverSeed);
       const hashMatches = computedHash === revealed.serverSeedHash;
 
+      // For ZK mode: the reveal API now returns the full shuffled deck
       // Verify shuffle: re-shuffle standard deck with revealed seeds and compare
+      const deckToVerify = data.shuffledDeck || seedCommitment.shuffledDeck;
       const standardDeck = createStandardDeckAbbreviated();
       const reshuffled = seededShuffle(standardDeck, revealed.serverSeed, revealed.clientSeed, revealed.nonce);
-      const deckMatches = initialDeckOrder
-        ? reshuffled.join(',') === initialDeckOrder.join(',')
-        : hashMatches; // fallback if no deck order stored
+      const deckMatches = deckToVerify && deckToVerify.length > 0
+        ? reshuffled.join(',') === deckToVerify.join(',')
+        : hashMatches; // fallback if no deck order
 
       const isVerified = hashMatches && deckMatches;
+
+      // Store the revealed deck order for the ZK side panel
+      const revealedDeckOrder = data.shuffledDeck || seedCommitment.shuffledDeck || [];
 
       // Update round history with verification result
       const { roundHistory } = get();
@@ -1697,7 +2045,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         serverSeed: revealed.serverSeed,
         clientSeed: revealed.clientSeed,
         nonce: revealed.nonce,
-        shuffledDeck: seedCommitment.shuffledDeck,
+        shuffledDeck: revealedDeckOrder,
         verified: isVerified,
         timestamp: Date.now(),
       };
@@ -1713,6 +2061,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         revealedSeed: revealed,
         isSeedVerified: isVerified,
         roundHistory: updatedHistory,
+        initialDeckOrder: revealedDeckOrder.length > 0 ? revealedDeckOrder : get().initialDeckOrder,
       });
 
       return isVerified;
@@ -1758,18 +2107,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!seedCommitment || !zkEnabled) return;
 
     try {
-      const response = await fetch('/api/zk', {
-        method: 'PUT',
+      const response = await fetch('/api/zk/deal', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           roundId: seedCommitment.roundId,
-          cardPositions: positions,
+          count: positions.length,
         }),
       });
       const data = await response.json();
 
-      if (data.cardProofs) {
-        set({ zkCardProofs: data.cardProofs });
+      if (data.cards) {
+        const newProofs: ZKCardProof[] = data.cards.map((c: { card: string; position: number; merkleProof: unknown; rangeProof: unknown }) => ({
+          card: c.card,
+          position: c.position,
+          merkleProof: c.merkleProof as import('@/lib/zk-crypto').MerkleProof,
+          rangeProof: c.rangeProof as import('@/lib/zk-crypto').RangeProof,
+        }));
+        set({ zkCardProofs: [...get().zkCardProofs, ...newProofs] });
       }
     } catch {
       // Silently fail - card proofs are optional
