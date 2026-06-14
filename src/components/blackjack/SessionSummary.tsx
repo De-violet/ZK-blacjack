@@ -87,7 +87,7 @@ export default function SessionSummary({ open, onOpenChange }: SessionSummaryPro
         currentWinStreak++
         currentLossStreak = 0
         bestStreak = Math.max(bestStreak, currentWinStreak)
-      } else if (hand.result === 'loss') {
+      } else if (hand.result === 'lose' || hand.result === 'dealerBlackjack') {
         currentLossStreak++
         currentWinStreak = 0
         worstStreak = Math.max(worstStreak, currentLossStreak)
@@ -199,7 +199,7 @@ export default function SessionSummary({ open, onOpenChange }: SessionSummaryPro
     visible: (i: number) => ({
       opacity: 1,
       y: 0,
-      transition: { delay: i * 0.08, duration: 0.4, ease: 'easeOut' },
+      transition: { delay: i * 0.08, duration: 0.4, ease: 'easeOut' as const },
     }),
   }
 

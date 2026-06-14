@@ -56,6 +56,9 @@ export type AutoplaySpeed = 'slow' | 'medium' | 'fast';
 export type AutoplayStrategy = 'basic' | 'random';
 export type BetStrategy = 'flat' | 'martingale' | 'paroli' | '1-3-2-6' | 'percentage' | 'count';
 
+// Re-export types from blackjack for convenience
+export type { GameResult, GameStats } from '@/lib/blackjack';
+
 export interface GameHistoryEntry {
   id: number;
   result: GameResult;
@@ -372,8 +375,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const dealerHand = [d1Card, d2Card];
 
     // Calculate side bet results
-    const ppResult = actualPPBet > 0 ? checkPerfectPair(playerHand) : { type: null as const, payout: 0 };
-    const pp3Result = actualPP3Bet > 0 ? check21Plus3(playerHand, d1Card) : { type: null as const, payout: 0 };
+    const ppResult = actualPPBet > 0 ? checkPerfectPair(playerHand) : { type: null as PerfectPairType, payout: 0 };
+    const pp3Result = actualPP3Bet > 0 ? check21Plus3(playerHand, d1Card) : { type: null as TwentyOnePlusThreeType, payout: 0 };
     const ppWinAmount = ppResult.type ? actualPPBet * (ppResult.payout + 1) : 0;
     const pp3WinAmount = pp3Result.type ? actualPP3Bet * (pp3Result.payout + 1) : 0;
     const storedPPResult = actualPPBet > 0 ? { type: ppResult.type, payout: ppResult.payout, winAmount: ppWinAmount } : null;

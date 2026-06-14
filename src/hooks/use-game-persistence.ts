@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useGameStore } from '@/store/game-store';
 import { INITIAL_BALANCE, DEFAULT_STATS } from '@/lib/blackjack';
-import type { GameStats, GameHistoryEntry, BetStrategy } from '@/store/game-store';
+import type { GameStats, GameHistoryEntry, BetStrategy, GameResult } from '@/store/game-store';
 
 const STORAGE_KEY = 'blackjack-game-state';
 const DEBOUNCE_MS = 500;
@@ -156,11 +156,11 @@ export function useGamePersistence() {
       }
 
       debounceTimer.current = setTimeout(() => {
-        const persisted: PersistedState = {} as PersistedState;
+        const persisted = {} as Record<string, unknown>;
         for (const field of fields) {
           persisted[field] = state[field];
         }
-        saveState(persisted);
+        saveState(persisted as unknown as PersistedState);
         setHasSavedState(true);
       }, DEBOUNCE_MS);
     });

@@ -5,7 +5,7 @@ import { X, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function StatsPanel() {
-  const { stats, showStats, toggleStats, balance } = useGameStore();
+  const { stats, showStats, toggleStats, balance, history } = useGameStore();
 
   if (!showStats) return null;
 
@@ -70,11 +70,11 @@ export function StatsPanel() {
           </div>
 
           {/* Recent History */}
-          {stats.history && stats.history.length > 0 && (
+          {history && history.length > 0 && (
             <div>
               <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Recent Games</h3>
               <div className="space-y-1 max-h-48 overflow-y-auto">
-                {stats.history.slice(-15).reverse().map((entry, i) => {
+                {history.slice(-15).reverse().map((entry, i) => {
                   const isWin = entry.result === 'win' || entry.result === 'blackjack';
                   const isLoss = entry.result === 'lose' || entry.result === 'dealerBlackjack';
                   return (

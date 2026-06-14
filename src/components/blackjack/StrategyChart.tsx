@@ -202,7 +202,7 @@ function useCurrentHandHighlight() {
 }
 
 // ─── Hard Totals Table ─────────────────────────────────────────
-function HardTotalsTable({ currentRow, currentCol }: { currentRow: string | null; currentCol: number }) {
+function HardTotalsTable({ currentRow, currentCol }: { currentRow: string | null; currentCol: number | null }) {
   return (
     <div className="overflow-x-auto -mx-2 px-2">
       <table className="w-full border-collapse min-w-[440px]">
@@ -256,7 +256,7 @@ function HardTotalsTable({ currentRow, currentCol }: { currentRow: string | null
 }
 
 // ─── Soft Totals Table ─────────────────────────────────────────
-function SoftTotalsTable({ currentRow, currentCol }: { currentRow: string | null; currentCol: number }) {
+function SoftTotalsTable({ currentRow, currentCol }: { currentRow: string | null; currentCol: number | null }) {
   return (
     <div className="overflow-x-auto -mx-2 px-2">
       <table className="w-full border-collapse min-w-[440px]">
@@ -309,7 +309,7 @@ function SoftTotalsTable({ currentRow, currentCol }: { currentRow: string | null
 }
 
 // ─── Pairs Table ───────────────────────────────────────────────
-function PairsTable({ currentRow, currentCol }: { currentRow: string | null; currentCol: number }) {
+function PairsTable({ currentRow, currentCol }: { currentRow: string | null; currentCol: number | null }) {
   return (
     <div className="overflow-x-auto -mx-2 px-2">
       <table className="w-full border-collapse min-w-[440px]">

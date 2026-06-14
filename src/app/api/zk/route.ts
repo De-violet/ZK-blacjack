@@ -293,7 +293,7 @@ export async function PUT(request: Request) {
     const originalDeck = createStandardDeckAbbreviated();
     const simRng = new SeededRNG(serverSeed, clientSeed, nonce);
     const simDeck = [...originalDeck];
-    const shuffleSteps = [];
+    const shuffleSteps: { i: number; j: number; swapCommitment: string; cardI: string; cardJ: string }[] = [];
     for (let i = simDeck.length - 1; i > 0; i--) {
       const j = simRng.nextInt(i + 1);
       shuffleSteps.push({
