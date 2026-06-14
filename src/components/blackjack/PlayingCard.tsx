@@ -1,6 +1,7 @@
 'use client';
 
 import { Card as CardType, getSuitSymbol, getSuitColor } from '@/lib/blackjack';
+import { useGameStore } from '@/store/game-store';
 
 interface PlayingCardProps {
   card: CardType;
@@ -11,6 +12,7 @@ interface PlayingCardProps {
   isWinningHand?: boolean;
   isDealerReveal?: boolean;
   isDealer?: boolean;
+  showZKBadge?: boolean;
 }
 
 export function PlayingCard({
@@ -21,7 +23,9 @@ export function PlayingCard({
   isWinningHand = false,
   isDealerReveal = false,
   isDealer = false,
+  showZKBadge = false,
 }: PlayingCardProps) {
+  const zkEnabled = useGameStore(state => state.zkEnabled);
   const isRed = getSuitColor(card.suit) === 'red';
   const suitSymbol = getSuitSymbol(card.suit);
   const isAce = card.rank === 'A';
@@ -168,6 +172,15 @@ export function PlayingCard({
 
       {/* Subtle inner border */}
       <div className="absolute inset-[1.5px] rounded-[3px] border border-gray-100/40 pointer-events-none" />
+
+      {/* ZK Verified Badge */}
+      {(showZKBadge || zkEnabled) && (
+        <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-3.5 sm:h-3.5 bg-violet-600 rounded-full flex items-center justify-center shadow-md border border-violet-400/50" title="ZK Verified Card">
+          <svg viewBox="0 0 10 10" className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" fill="currentColor">
+            <path d="M3.5 7L1.5 5l0.7-0.7L3.5 5.6l3.3-3.3L7.5 3z"/>
+          </svg>
+        </div>
+      )}
 
       {/* Glossy highlight */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent pointer-events-none rounded-md" />

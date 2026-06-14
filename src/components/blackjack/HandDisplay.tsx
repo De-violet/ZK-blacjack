@@ -12,9 +12,10 @@ interface HandDisplayProps {
   isResultPhase?: boolean;
   isWinningHand?: boolean;
   isDealerTurn?: boolean;
+  showZKBadge?: boolean;
 }
 
-export function HandDisplay({ cards, label, hideScore = false, isDealer = false, isActive = false, isResultPhase = false, isWinningHand = false, isDealerTurn = false }: HandDisplayProps) {
+export function HandDisplay({ cards, label, hideScore = false, isDealer = false, isActive = false, isResultPhase = false, isWinningHand = false, isDealerTurn = false, showZKBadge = false }: HandDisplayProps) {
   const hasHiddenCard = cards.some(c => !c.faceUp);
   const score = hasHiddenCard ? calculateScore(cards) : calculateScoreAllCards(cards);
   const handIsBlackjack = isHandBlackjack(cards);
@@ -110,6 +111,7 @@ export function HandDisplay({ cards, label, hideScore = false, isDealer = false,
                 isWinningHand={isWinningHand}
                 isDealer={isDealer}
                 isDealerReveal={isDealer && isResultPhase && index === 1 && card.faceUp}
+                showZKBadge={showZKBadge}
               />
             ))}
           </div>

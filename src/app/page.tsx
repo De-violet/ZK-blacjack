@@ -212,6 +212,23 @@ export default function Home() {
         </div>
       </header>
 
+      {/* ─── ZK Trust Banner ──────────────────────────────────────── */}
+      {zkEnabled && (
+        <div className="w-full bg-gradient-to-r from-violet-950/80 via-violet-900/40 to-violet-950/80 border-b border-violet-500/20 px-3 py-1.5 flex items-center justify-center gap-2">
+          <ShieldCheck className="w-3.5 h-3.5 text-violet-400" />
+          <span className="text-[10px] sm:text-xs font-semibold text-violet-300">
+            Zero-Knowledge Proof Active
+          </span>
+          <span className="text-[8px] sm:text-[10px] text-violet-400/70 hidden sm:inline">
+            — Each card is cryptographically verified via Merkle Tree + VRF
+          </span>
+          <div className="flex items-center gap-1 ml-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+            <span className="text-[8px] text-violet-400/80 font-mono">LIVE</span>
+          </div>
+        </div>
+      )}
+
       {/* ─── Main Game Area ──────────────────────────────────────── */}
       <main className="flex-1 flex flex-col items-center px-2 sm:px-4 relative overflow-hidden min-h-0">
         {/* Casino felt background */}
@@ -240,6 +257,7 @@ export default function Home() {
               isDealer
               isResultPhase={isResultPhase}
               isDealerTurn={phase === 'dealerTurn'}
+              showZKBadge={zkEnabled}
             />
           </div>
 
@@ -286,6 +304,7 @@ export default function Home() {
                 label="Player"
                 isResultPhase={isResultPhase}
                 isWinningHand={isResultPhase && (result === 'win' || result === 'blackjack')}
+                showZKBadge={zkEnabled}
               />
             ) : (
               <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
@@ -351,14 +370,24 @@ export default function Home() {
           <div className="flex items-center gap-1.5">
             <div className="flex items-center gap-1 bg-violet-900/20 border border-violet-700/20 rounded px-1 py-0.5">
               <ShieldCheck className="w-2.5 h-2.5 text-violet-500" />
-              <span className="text-[8px] sm:text-[9px] font-bold text-violet-400 uppercase tracking-wider">Phase 4</span>
+              <span className="text-[8px] sm:text-[9px] font-bold text-violet-400 uppercase tracking-wider">ZK Verified</span>
               {zkEnabled && (
-                <span className="w-1 h-1 rounded-full bg-violet-400" style={{ animation: 'ghost-pulse 2s ease-in-out infinite' }} />
+                <span className="w-1 h-1 rounded-full bg-violet-400 animate-pulse" />
               )}
             </div>
+            {zkEnabled && zkCommitment && (
+              <span className="text-[7px] sm:text-[8px] text-violet-500/60 font-mono hidden sm:inline">
+                Merkle: {zkCommitment.merkleRoot.slice(0, 6)}...
+              </span>
+            )}
             <span className="text-gray-600 hidden sm:inline">♠ Blackjack 21</span>
           </div>
           <div className="flex items-center gap-2">
+            {zkEnabled && zkVerification && (
+              <span className={`text-[8px] font-bold ${zkVerification.verified ? 'text-emerald-500' : 'text-red-500'}`}>
+                {zkVerification.verified ? '✓ ZK Proven' : '✗ ZK Failed'}
+              </span>
+            )}
             <div className="hidden sm:flex items-center gap-1 text-[8px] text-gray-600">
               <kbd className="px-0.5 py-0.5 bg-gray-800/60 border border-gray-700/40 rounded text-[7px] font-mono">H</kbd>
               <span>Hit</span>
