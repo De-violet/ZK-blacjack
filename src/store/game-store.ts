@@ -352,9 +352,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
           nonce: data.nonce,
           shuffledDeck: data.shuffledDeck,
         };
-        // Phase 4: Store ZK commitment data
+        // Phase 4: Store ZK commitment data and auto-fetch card proofs
         if (data.zkCommitment) {
           zkCommit = data.zkCommitment;
+          // Auto-fetch proofs for first 5 cards (initial deal)
+          try {
+            const proofResponse = await fetch('/api/zk', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                roundId: data.roundId,
+                cardPositions: [0, 1, 2, 3, 4],
+              }),
+            });
+            const proofData = await proofResponse.json();
+            if (proofData.cardProofs) {
+              // Will be set after zkCommitment is set below
+              setTimeout(() => set({ zkCardProofs: proofData.cardProofs }), 0);
+            }
+          } catch {
+            // Card proofs are optional, silently fail
+          }
         }
         // Convert abbreviated deck from server to Card objects
         deck = parseAbbreviatedDeck(commitment.shuffledDeck) as Card[];

@@ -73,7 +73,7 @@ export function ZKSidePanel() {
               <div className="min-w-0">
                 <div className="text-[8px] text-gray-500 uppercase tracking-wider">Card Proofs</div>
                 <span className="text-[9px] text-cyan-300/80 font-mono">
-                  {zkCardProofs.length > 0 ? `${zkCardProofs.length} verified` : 'No cards dealt yet'}
+                  {zkCardProofs.length > 0 ? `${zkCardProofs.length} verified` : zkCommitment ? 'Fetching proofs...' : 'Start a round to verify cards'}
                 </span>
               </div>
             </div>
