@@ -147,7 +147,7 @@ export default function Home() {
               size="sm"
               onClick={handleToggleSound}
               className={`h-7 w-7 p-0 transition-colors duration-200 ${
-                soundEnabled ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-900/20' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
+                soundEnabled ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-900/20' : 'text-gray-300 hover:text-white hover:bg-gray-800'
               }`}
             >
               {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -158,7 +158,7 @@ export default function Home() {
               variant="ghost"
               size="sm"
               onClick={() => setShowHelp(true)}
-              className="h-8 w-8 p-0 text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+              className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
             >
               <HelpCircle className="w-4 h-4" />
             </Button>
@@ -168,7 +168,7 @@ export default function Home() {
               variant="ghost"
               size="sm"
               onClick={toggleStats}
-              className="h-8 w-8 p-0 text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+              className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
             >
               <BarChart3 className="w-4 h-4" />
             </Button>
@@ -179,7 +179,7 @@ export default function Home() {
               size="sm"
               onClick={toggleZKPanel}
               className={`h-8 w-8 p-0 transition-colors relative ${
-                zkEnabled ? 'text-violet-400 hover:text-violet-300 hover:bg-violet-900/20' : 'text-gray-500 hover:text-white hover:bg-gray-800'
+                zkEnabled ? 'text-violet-400 hover:text-violet-300 hover:bg-violet-900/20' : 'text-gray-300 hover:text-white hover:bg-gray-800'
               }`}
             >
               <ShieldCheck className="w-4 h-4" />
@@ -194,7 +194,7 @@ export default function Home() {
               size="sm"
               onClick={toggleProvablyFairPanel}
               className={`h-8 w-8 p-0 transition-colors relative ${
-                provablyFairEnabled ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20' : 'text-gray-500 hover:text-white hover:bg-gray-800'
+                provablyFairEnabled ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20' : 'text-gray-300 hover:text-white hover:bg-gray-800'
               }`}
             >
               <Shield className="w-4 h-4" />
@@ -208,7 +208,7 @@ export default function Home() {
               variant="ghost"
               size="sm"
               onClick={resetGame}
-              className="h-8 w-8 p-0 text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+              className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
             >
               <RotateCcw className="w-4 h-4" />
             </Button>
