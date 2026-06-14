@@ -26,6 +26,7 @@ export default function Home() {
 
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
+  const [showSidePanel, setShowSidePanel] = useState(false);
   const isResultPhase = phase === 'result';
   const sessionProfit = balance - 1000;
 
@@ -112,9 +113,7 @@ export default function Home() {
   }, [handleKeyDown]);
 
   return (
-    <div className="h-[100dvh] flex flex-col lg:flex-row bg-gray-950 text-white overflow-hidden">
-      {/* ─── Left Column: Game ─── */}
-      <div className="flex-1 flex flex-col min-w-0 lg:max-w-[65%]">
+    <div className="h-[100dvh] flex flex-col bg-gray-950 text-white overflow-hidden">
       {/* ─── Header ─────────────────────────────────────────────── */}
       <header className="w-full bg-gray-900/95 backdrop-blur-sm border-b border-gray-800/50 px-2 sm:px-4 py-2 sm:py-2.5 z-40 flex-shrink-0 relative overflow-visible">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
@@ -171,15 +170,15 @@ export default function Home() {
               <BarChart3 className="w-4 h-4" />
             </button>
 
-            {/* ZK Proofs (Phase 4) */}
+            {/* ZK Dashboard - toggles side panel */}
             <button
-              onClick={toggleZKPanel}
+              onClick={() => { toggleZKPanel(); setShowSidePanel(!showSidePanel); }}
               className={`flex items-center justify-center h-8 w-8 rounded-lg border transition-colors relative ${
                 zkEnabled
                   ? 'bg-violet-900/50 border-violet-600/40 text-violet-400 hover:bg-violet-800/60'
                   : 'bg-gray-700/60 border-gray-600/30 text-purple-400 hover:bg-gray-600/80'
               }`}
-              title="ZK Proofs"
+              title="ZK Dashboard"
             >
               <ShieldCheck className="w-4 h-4" />
               {zkEnabled && (
@@ -523,12 +522,30 @@ export default function Home() {
 
       {/* ZK Proof Panel */}
       <ZKProofPanel />
-      </div>
 
-      {/* ─── Right Column: ZK Side Panel ─── */}
-      <div className="hidden lg:flex w-[320px] xl:w-[360px] flex-shrink-0 bg-gray-900/50 border-l border-gray-800/40 overflow-hidden">
-        <ZKSidePanel />
-      </div>
+      {/* ─── ZK Side Panel (Sliding) ─── */}
+      {showSidePanel && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setShowSidePanel(false)} />
+          <div className="fixed right-0 top-0 bottom-0 w-[300px] sm:w-[320px] bg-gray-900/98 border-l border-gray-700/40 z-50 overflow-y-auto shadow-2xl"
+            style={{ animation: 'overlay-slide-up 0.2s ease-out' }}
+          >
+            <div className="flex items-center justify-between p-3 border-b border-gray-800/60 sticky top-0 bg-gray-900/98 z-10">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-violet-400" />
+                <span className="text-sm font-bold text-white">ZK Dashboard</span>
+              </div>
+              <button
+                onClick={() => setShowSidePanel(false)}
+                className="h-7 w-7 flex items-center justify-center rounded-lg bg-gray-800/60 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <ZKSidePanel />
+          </div>
+        </>
+      )}
     </div>
   );
 }
