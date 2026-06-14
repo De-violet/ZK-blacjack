@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   keywords: ["Blackjack", "21", "Web3", "ZKP", "Zero-Knowledge", "Casino", "Next.js"],
   authors: [{ name: "ZK Casino" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
   },
   openGraph: {
     title: "Blackjack 21 — ZK Casino",

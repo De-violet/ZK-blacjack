@@ -113,7 +113,7 @@ export default function Home() {
   return (
     <div className="h-[100dvh] flex flex-col bg-gray-950 text-white overflow-hidden">
       {/* ─── Header ─────────────────────────────────────────────── */}
-      <header className="w-full bg-gray-900/95 backdrop-blur-sm border-b border-gray-800/50 px-2 sm:px-4 py-1.5 sm:py-2 z-40 flex-shrink-0 relative">
+      <header className="w-full bg-gray-900/95 backdrop-blur-sm border-b border-gray-800/50 px-2 sm:px-4 py-2 sm:py-2.5 z-40 flex-shrink-0 relative overflow-visible">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           {/* Logo & Title */}
@@ -128,10 +128,10 @@ export default function Home() {
           </div>
 
           {/* Right side */}
-          <div className="flex items-center gap-1 sm:gap-1.5">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {/* Balance pill */}
             <div className="flex items-center gap-1 bg-gray-800/70 rounded-lg px-2 sm:px-2.5 py-1 border border-gray-700/30">
-              <Wallet className="w-3 h-3 text-amber-400" />
+              <Wallet className="w-4 h-4 text-amber-400" />
               <span
                 className="text-amber-300 font-mono font-bold text-[11px] sm:text-sm"
                 key={`bal-${balance}`}
@@ -150,7 +150,7 @@ export default function Home() {
                 soundEnabled ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-900/20' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
               }`}
             >
-              {soundEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </Button>
 
             {/* Help */}
@@ -158,9 +158,9 @@ export default function Home() {
               variant="ghost"
               size="sm"
               onClick={() => setShowHelp(true)}
-              className="h-7 w-7 p-0 text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+              className="h-8 w-8 p-0 text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
             >
-              <HelpCircle className="w-3 h-3" />
+              <HelpCircle className="w-4 h-4" />
             </Button>
 
             {/* Stats */}
@@ -168,9 +168,9 @@ export default function Home() {
               variant="ghost"
               size="sm"
               onClick={toggleStats}
-              className="h-7 w-7 p-0 text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+              className="h-8 w-8 p-0 text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
             >
-              <BarChart3 className="w-3 h-3" />
+              <BarChart3 className="w-4 h-4" />
             </Button>
 
             {/* ZK Proofs (Phase 4) */}
@@ -178,11 +178,11 @@ export default function Home() {
               variant="ghost"
               size="sm"
               onClick={toggleZKPanel}
-              className={`h-7 w-7 p-0 transition-colors relative ${
+              className={`h-8 w-8 p-0 transition-colors relative ${
                 zkEnabled ? 'text-violet-400 hover:text-violet-300 hover:bg-violet-900/20' : 'text-gray-500 hover:text-white hover:bg-gray-800'
               }`}
             >
-              <ShieldCheck className="w-3 h-3" />
+              <ShieldCheck className="w-4 h-4" />
               {zkEnabled && (
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-violet-400 border border-gray-900" />
               )}
@@ -193,11 +193,11 @@ export default function Home() {
               variant="ghost"
               size="sm"
               onClick={toggleProvablyFairPanel}
-              className={`h-7 w-7 p-0 transition-colors relative ${
+              className={`h-8 w-8 p-0 transition-colors relative ${
                 provablyFairEnabled ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20' : 'text-gray-500 hover:text-white hover:bg-gray-800'
               }`}
             >
-              <Shield className="w-3 h-3" />
+              <Shield className="w-4 h-4" />
               {provablyFairEnabled && (
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400 border border-gray-900" />
               )}
@@ -208,9 +208,9 @@ export default function Home() {
               variant="ghost"
               size="sm"
               onClick={resetGame}
-              className="h-7 w-7 p-0 text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+              className="h-8 w-8 p-0 text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
             >
-              <RotateCcw className="w-3 h-3" />
+              <RotateCcw className="w-4 h-4" />
             </Button>
           </div>
         </div>
